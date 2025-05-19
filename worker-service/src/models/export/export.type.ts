@@ -11,28 +11,36 @@ export type ConfigSheet = {
   ranges: ConfigRange[];
 };
 
-export type ConfigRangeTable = {
-  column: string;
-  data: string;
-};
-
 export type ConfigRange = {
   no: number;
   beginCell: string;
   endCell: string;
   columns: string[];
-  table: ConfigRangeTable | null | undefined;
+  children: ConfigRange[];
+  table: ConfigRangeTable | undefined;
+};
+
+export type ConfigRangeTable = {
+  column: string;
+  data: string;
 };
 
 // Type data
-export type SingleData = { [key: string]: string | number | null | undefined };
-
 export type DataTableLevel = {
   level: number;
+  setDataTable: Set<string>;
   dataTables: DataTable[];
 };
 
 export type DataTable = {
-  table: string;
-  data: SingleData[];
+  key: string;
+  setData: Set<string>;
+  data: DataRow[];
 };
+
+export type DataRow = {
+  dataLevelTable: DataTableLevel | undefined;
+  data: DataValue;
+};
+
+export type DataValue = { [key: string]: string | number | null | undefined };
