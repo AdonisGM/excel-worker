@@ -14,6 +14,6 @@ export class ExportController {
     const { code, data } = testDto;
     const a = await this.exportService.processExport(code, data);
 
-    return 'a';
+    return {};
   }
 }

@@ -10,7 +10,7 @@ const testSchema = z
       .nonempty({
         message: 'Code is required',
       }),
-    data: z.array(z.record(z.any())),
+    data: z.array(z.array(z.record(z.any()))),
   })
   .required();
 

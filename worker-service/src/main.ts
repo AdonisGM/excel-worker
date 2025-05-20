@@ -15,7 +15,7 @@ async function bootstrap() {
   const logger = app.get(LoggerService);
   app.useLogger(logger);
 
-  logger.log(`============ Starting worker service - Information ===========`);
+  logger.log(`============ Starting worker service - Information ============`);
   logger.log(`=> OS: ${process.platform}`);
   logger.log(`=> CPU: ${process.arch}`);
   logger.log(`=> Node: ${process.version}`);
@@ -47,8 +47,8 @@ async function bootstrap() {
   app.disable('x-powered-by');
 
   // Increase payload size limit (e.g., 100mb)
-  app.use(bodyParser.json({ limit: '100mb' }));
-  app.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
+  app.use(bodyParser.json({ limit: '500mb' }));
+  app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
 
   await app.listen(3000);
 }

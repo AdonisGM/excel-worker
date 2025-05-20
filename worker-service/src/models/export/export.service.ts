@@ -12,20 +12,29 @@ import {
   DataTableLevel,
   DataValue,
 } from './export.type';
+import { UtilService } from '../util/util.service';
 
 @Injectable()
 export class ExportService {
-  constructor(private readonly logger: LoggerService) {}
+  constructor(
+    private readonly logger: LoggerService,
+    private readonly utilService: UtilService,
+  ) {}
 
   // Process export
   public async processExport(
     fileCode: string,
-    data: DataValue[],
+    data: DataValue[][],
   ): Promise<string | void> {
     const startTime = { startTime: performance.now() };
     this.logger.log(`-------- Start export --------`);
     this.logger.log(`Processing export for file code: ${fileCode}`);
-    this.logger.log(`Line date: ${data.length}`);
+    this.logger.log(
+      `Line data: ${data.map((e) => e.length).reduce((a, b) => a + b)}`,
+    );
+    this.logger.log(
+      `Size: ${(new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2)}KB`,
+    );
 
     const workbook = await this.readFileTemplate(fileCode);
     this.logger.log(
@@ -38,22 +47,57 @@ export class ExportService {
       `\t(2)  Get config data => Done ${this.logTime(startTime)}`,
     );
 
-    // Get general data
-    let generalData: DataValue | undefined = undefined;
-    if (configWorkbook.isHasGeneralData) {
-      generalData = data.shift();
-    }
-    this.logger.log(
-      `\t(3)  Get general data => Done ${this.logTime(startTime)}`,
-    );
-
     // Process data each sheet
     for (const [index, configSheet] of configWorkbook.sheet.entries()) {
-      const processData = this.processData(configSheet, data);
+      this.logger.log(`\t(3)  Process sheet index - ${index + 1}`);
+      // Get general data
+      let generalData: DataValue | undefined = undefined;
+      if (configWorkbook.isHasGeneralData) {
+        generalData = data[index].shift();
+      }
       this.logger.log(
-        `\t(4.sheet_${index + 1})  Process data => Done ${this.logTime(startTime)}`,
+        `\t\t(3.1)  Get general data => Done ${this.logTime(startTime)}`,
+      );
+
+      // Process main data
+      const processData = this.processData(configSheet, data[index]);
+      this.logger.log(
+        `\t\t(3.2)  Process data => Done ${this.logTime(startTime)}`,
+      );
+
+      // Get worksheet
+      const worksheet = workbook.worksheets[index];
+
+      // Generate file excel - general data
+      if (generalData) {
+        this.generateExcelFileGeneral(worksheet, generalData);
+      }
+      this.logger.log(
+        `\t\t(3.3)  Generate general excel => Done ${this.logTime(startTime)}`,
+      );
+
+      // Generate file excel - main data
+      this.generateExcelFile();
+      this.logger.log(
+        `\t\t(3.4)  Generate main excel => Done ${this.logTime(startTime)}`,
+      );
+
+      // Merge cell
+      this.logger.log(
+        `\t\t(3.5)  Merge cell => Done ${this.logTime(startTime)}`,
       );
     }
+
+    // Remove sheet config
+    this.removeSheetConfig(workbook);
+    this.logger.log(
+      `\t(4)  Remove sheet config => Done ${this.logTime(startTime)}`,
+    );
+
+    // Save file
+    const filePath = `results/${fileCode}_${this.utilService.generateUUIDv7()}.xlsx`;
+    await workbook.xlsx.writeFile(filePath);
+    this.logger.log(`\t(5)  Save file => Done ${this.logTime(startTime)}`);
 
     this.logger.log(`-------- End export --------`);
     return '';
@@ -465,6 +509,36 @@ export class ExportService {
     }
   }
 
+  private generateExcelFileGeneral(
+    worksheet: Excel.Worksheet,
+    generalData: DataValue,
+  ): void {
+    const rowCount = worksheet.rowCount;
+
+    // Loop through each cell in the row
+    for (let i = 1; i <= rowCount; i++) {
+      const selectedRow = worksheet.getRow(i);
+      const cellNumber = selectedRow.cellCount;
+
+      for (let j = 1; j <= cellNumber; j++) {
+        const selectedCell = selectedRow.getCell(j);
+
+        // Generate data
+        this.replaceText(selectedCell, generalData);
+      }
+    }
+
+    for (let i = 1; i <= rowCount; i++) {
+      const selectedRow = worksheet.getRow(i);
+      const cellNumber = selectedRow.cellCount;
+      for (let j = 1; j <= cellNumber; j++) {
+        this.logger.log(`Cell ${i}-${j}: ${selectedRow.getCell(j).value}`);
+      }
+    }
+  }
+
+  private generateExcelFile(): void {}
+
   private logTime(time: { startTime: number }): string {
     const currentTime = performance.now();
 
@@ -477,5 +551,30 @@ export class ExportService {
       maximumFractionDigits: 3,
     });
     return `${formattedTime}ms`;
+  }
+
+  private replaceText(cell: Excel.Cell, data: DataValue): void {
+    const cellValue = cell.value;
+
+    // Template string like <#general.NAME>
+    if (typeof cellValue === 'string') {
+      const regex = /<#general\.(.*?)>/g;
+      const matches = cellValue.match(regex);
+
+      if (matches) {
+        for (const match of matches) {
+          const key = match.replace(/<#general\./, '').replace(/>/, '');
+          const value = data[key];
+
+          if (value !== undefined) {
+            cell.value = cellValue.replace(match, String(value));
+          }
+        }
+      }
+    }
+  }
+
+  private removeSheetConfig(workbook: Excel.Workbook): void {
+    workbook.removeWorksheet('config');
   }
 }
