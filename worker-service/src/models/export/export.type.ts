@@ -44,3 +44,12 @@ export type DataRow = {
 };
 
 export type DataValue = { [key: string]: string | number | null | undefined };
+
+// Merge cell type
+export type CMergeCell = {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+  sheetName: undefined;
+};
