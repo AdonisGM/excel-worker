@@ -33,7 +33,7 @@ export class LoggerService {
 
     const transport = new winston.transports.DailyRotateFile({
       filename: '%DATE%/info-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
+      datePattern: 'YYYY-MM-DD_HH',
       zippedArchive: true,
       maxSize: '50m',
       maxFiles: '30d',
@@ -77,15 +77,43 @@ export class LoggerService {
    *
    * @return {void}
    */
-  public error(message: string): void {
+  // public error(message: string): void {
+  //   // get class name call this method
+  //   const stack = new Error().stack;
+  //   const className =
+  //     stack?.split('\n')[2].trim().split(' ')[1] ?? 'UnknownClass';
+  //
+  //   this.logger.error({
+  //     className: className,
+  //     message: message,
+  //   });
+  // }
+
+  /**
+   * Log an error message.
+   *
+   *
+   * @return {void}
+   * @param { Error } e
+   */
+  public error(e: Error | string): void {
     // get class name call this method
     const stack = new Error().stack;
     const className =
       stack?.split('\n')[2].trim().split(' ')[1] ?? 'UnknownClass';
 
+    if (typeof e === 'string') {
+      const newError = new Error(e);
+      this.logger.error({
+        className: className,
+        message: newError.stack,
+      });
+      return;
+    }
+
     this.logger.error({
       className: className,
-      message: message,
+      message: e.stack,
     });
   }
 

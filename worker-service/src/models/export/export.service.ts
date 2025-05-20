@@ -22,39 +22,41 @@ export class ExportService {
     fileCode: string,
     data: DataValue[],
   ): Promise<string | void> {
-    // try {
+    const startTime = { startTime: performance.now() };
     this.logger.log(`-------- Start export --------`);
     this.logger.log(`Processing export for file code: ${fileCode}`);
+    this.logger.log(`Line date: ${data.length}`);
 
     const workbook = await this.readFileTemplate(fileCode);
-    this.logger.log(`\t(1)  Read file template => Done`);
+    this.logger.log(
+      `\t(1)  Read file template => Done ${this.logTime(startTime)}`,
+    );
 
     // Get config file
     const configWorkbook = this.getConfigWorkbook(workbook);
-    this.logger.log(`\t(2)  Get config data => Done`);
+    this.logger.log(
+      `\t(2)  Get config data => Done ${this.logTime(startTime)}`,
+    );
 
     // Get general data
     let generalData: DataValue | undefined = undefined;
     if (configWorkbook.isHasGeneralData) {
       generalData = data.shift();
     }
-    this.logger.log(`\t(3)  Get general data => Done`);
+    this.logger.log(
+      `\t(3)  Get general data => Done ${this.logTime(startTime)}`,
+    );
 
     // Process data each sheet
-    for (const configSheet of configWorkbook.sheet) {
+    for (const [index, configSheet] of configWorkbook.sheet.entries()) {
       const processData = this.processData(configSheet, data);
-      this.logger.log(`\t(4)  this.processData => Done`);
-
-      console.log(JSON.stringify(processData));
+      this.logger.log(
+        `\t(4.sheet_${index + 1})  Process data => Done ${this.logTime(startTime)}`,
+      );
     }
 
     this.logger.log(`-------- End export --------`);
     return '';
-    // } catch (e) {
-    //   const typedError = e as Error;
-    //   this.logger.error(`Error processing export: ${typedError.message}`);
-    //   throw new Error(`Error processing export: ${typedError.message}`);
-    // }
   }
 
   // Read file template
@@ -293,17 +295,11 @@ export class ExportService {
         (e) => e.table?.data === dataKey,
       )!;
 
-      // Check child config range has multiple table config
-      const childConfigRangeTable = selectedConfigRange.children[0]?.table;
-
-      let childDataLevelTable: DataTableLevel | undefined = undefined;
-      if (childConfigRangeTable) {
-        childDataLevelTable = {
-          level: level + 1,
-          dataTables: [],
-          setDataTable: new Set<string>(),
-        };
-      }
+      const childDataLevelTable: DataTableLevel = {
+        level: level + 1,
+        dataTables: [],
+        setDataTable: new Set<string>(),
+      };
 
       // Create new data row
       const newDataRow: DataRow = {
@@ -355,7 +351,11 @@ export class ExportService {
           // Create new data row
           const newDataRow: DataRow = {
             data: dataItem,
-            dataLevelTable: undefined,
+            dataLevelTable: {
+              level: level + 1,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
           };
 
           selectedDataTable.data.push(newDataRow);
@@ -367,7 +367,11 @@ export class ExportService {
           // Create new data row
           const newDataRow: DataRow = {
             data: dataItem,
-            dataLevelTable: undefined,
+            dataLevelTable: {
+              level: level + 1,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
           };
 
           // Add new data row to data table
@@ -390,30 +394,59 @@ export class ExportService {
           // Create new data row
           const newDataRow: DataRow = {
             data: dataItem,
-            dataLevelTable: undefined,
+            dataLevelTable: {
+              level: level + 1,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
           };
 
           newDataTable.data.push(newDataRow);
           dataLevelTable.dataTables.push(newDataTable);
         } else {
-          console.log(JSON.stringify(dataLevelTable.dataTables));
-
           // Check data key is existing
-          const selectedDataTable = dataLevelTable.dataTables.find(
-            (e) => e.key === dataRowKey,
-          )!;
+          const selectedDataTable = dataLevelTable.dataTables[0];
 
-          if (!selectedDataTable.setData.has(dataRowKey)) {
-            selectedDataTable.setData.add(dataRowKey);
+          if (!selectedDataTable) {
+            // Create new data table
+            const newDataTable: DataTable = {
+              key: dataRowKey,
+              setData: new Set<string>(),
+              data: [],
+            };
 
             // Create new data row
             const newDataRow: DataRow = {
               data: dataItem,
-              dataLevelTable: undefined,
+              dataLevelTable: {
+                level: level + 1,
+                dataTables: [],
+                setDataTable: new Set<string>(),
+              },
             };
 
-            // Add new data row to data table
-            selectedDataTable.data.push(newDataRow);
+            newDataTable.data.push(newDataRow);
+            newDataTable.setData.add(dataRowKey);
+            dataLevelTable.dataTables.push(newDataTable);
+          } else {
+            const selectedDataTable = dataLevelTable.dataTables[0];
+
+            if (!selectedDataTable.setData.has(dataRowKey)) {
+              selectedDataTable.setData.add(dataRowKey);
+
+              // Create new data row
+              const newDataRow: DataRow = {
+                data: dataItem,
+                dataLevelTable: {
+                  level: level + 1,
+                  dataTables: [],
+                  setDataTable: new Set<string>(),
+                },
+              };
+
+              // Add new data row to data table
+              selectedDataTable.data.push(newDataRow);
+            }
           }
         }
 
@@ -421,16 +454,28 @@ export class ExportService {
         const selectedDataTable = dataLevelTable.dataTables[0];
         const childConfigRange = selectedConfigRange.children;
         if (childConfigRange.length > 0) {
-          for (const childConfig of childConfigRange) {
-            this.processDataRecursive(
-              selectedDataTable.data[0].dataLevelTable!,
-              level + 1,
-              childConfig.children,
-              dataItem,
-            );
-          }
+          this.processDataRecursive(
+            selectedDataTable.data[0].dataLevelTable!,
+            level + 1,
+            childConfigRange,
+            dataItem,
+          );
         }
       }
     }
+  }
+
+  private logTime(time: { startTime: number }): string {
+    const currentTime = performance.now();
+
+    const timeDiff = currentTime - time.startTime;
+    time.startTime = currentTime;
+
+    // Format time to "1,000.256ms"
+    const formattedTime = timeDiff.toLocaleString('en-US', {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+    return `${formattedTime}ms`;
   }
 }

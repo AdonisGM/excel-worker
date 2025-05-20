@@ -2,11 +2,11 @@
   "name": "adonis-service",
   "version": "0.0.1",
   "description": "",
-  "author": "",
+  "author": "Adonis Willer - Nguyen Manh Tung",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build && npm run obfuscate",
+    "build": "nest build",
     "obfuscate": "javascript-obfuscator dist --output dist",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

@@ -13,8 +13,8 @@ export class AppBootstrapService implements OnApplicationBootstrap {
   async onApplicationBootstrap() {
     this.appId = uuidv4();
 
-    await this.registerWorker();
-    await this.syncFileTemplate();
+    // await this.registerWorker();
+    // await this.syncFileTemplate();
   }
 
   getAppId(): string {
