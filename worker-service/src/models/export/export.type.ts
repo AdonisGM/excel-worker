@@ -39,7 +39,7 @@ export type DataTable = {
 };
 
 export type DataRow = {
-  dataLevelTable: DataTableLevel | undefined;
+  dataLevelTable: DataTableLevel;
   data: DataValue;
 };
 

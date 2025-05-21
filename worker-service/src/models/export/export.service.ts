@@ -14,6 +14,7 @@ import {
   DataValue,
 } from './export.type';
 import { UtilService } from '../util/util.service';
+import * as assert from 'node:assert';
 
 @Injectable()
 export class ExportService {
@@ -28,101 +29,113 @@ export class ExportService {
     data: DataValue[][],
   ): Promise<string | void> {
     const startTime = { startTime: performance.now() };
+    const beginTime = performance.now();
+
     this.logger.log(`-------- Start export --------`);
-    this.logger.log(`Processing export for file code: ${fileCode}`);
+    this.logger.log(`\tProcessing export for file code: ${fileCode}`);
     this.logger.log(
-      `Line data: ${data.map((e) => e.length).reduce((a, b) => a + b)}`,
+      `\tLine data: ${data.map((e) => e.length).reduce((a, b) => a + b)}`,
     );
     this.logger.log(
-      `Size: ${(new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2)}KB`,
+      `\tSize: ${(new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2)}KB`,
     );
 
-    const workbook = await this.readFileTemplate(fileCode);
-    this.logger.log(
-      `\t(1)  Read file template => Done ${this.logTime(startTime)}`,
-    );
+    const workbook = (await this.readFileTemplate(
+      fileCode,
+    )) as Excel.Workbook | null;
+    if (!workbook) {
+      this.logger.error(`Error reading file template`);
+      throw new Error('Error reading file template');
+    }
+    this.logStep(`(1)  Read file template`, this.logTime(startTime));
 
     // Get config file
     const configWorkbook = this.getConfigWorkbook(workbook);
-    this.logger.log(
-      `\t(2)  Get config data => Done ${this.logTime(startTime)}`,
-    );
+    this.logStep(`(2)  Get config data`, this.logTime(startTime));
 
     // Process data each sheet
     for (const [index, configSheet] of configWorkbook.sheet.entries()) {
-      this.logger.log(`\t(3)  Process sheet index - ${index + 1}`);
+      this.logStep(
+        `(3)  Process sheet index - ${index + 1}`,
+        this.logTime(startTime),
+      );
       // Get general data
       let generalData: DataValue | undefined = undefined;
       if (configWorkbook.isHasGeneralData) {
         generalData = data[index].shift();
       }
-      this.logger.log(
-        `\t\t(3.1)  Get general data => Done ${this.logTime(startTime)}`,
-      );
+      this.logStep(`(3.1)  Get general data`, this.logTime(startTime));
 
       // Process main data
       const processData = this.processData(configSheet, data[index]);
-      this.logger.log(
-        `\t\t(3.2)  Process data => Done ${this.logTime(startTime)}`,
-      );
+      this.logStep(`(3.2)  Process data`, this.logTime(startTime));
 
       // Get worksheet
       const worksheet = workbook.worksheets[index];
 
       // Get list merge cells in sheet
       const mergeCells = this.getListMergeCells(worksheet);
-      this.logger.log(
-        `\t\t(3.3)  Get list merge cells => Done ${this.logTime(startTime)}`,
+      this.logStep(`(3.3)  Get list merge cells`, this.logTime(startTime));
+
+      // Calculate total table height
+      const totalTableHeight = this.calculateTotalTableHeight(
+        worksheet,
+        configSheet.ranges,
+        undefined,
+        processData,
+      );
+      this.logStep(
+        `(3.4)  Calculate total table height`,
+        this.logTime(startTime),
       );
 
-      this.copyRow(worksheet, 5, 25);
+      // Insert empty rows
+      this.insertEmptyRows(worksheet, totalTableHeight, configSheet);
+      this.logStep(`(3.5)  Insert empty rows`, this.logTime(startTime));
 
-      // // Calculate total table height
-      // const totalTableHeight = this.calculateTotalTableHeight(
-      //   worksheet,
-      //   configSheet.ranges,
-      //   undefined,
-      //   processData,
-      // );
+      // Generate file excel - general data
+      if (generalData) {
+        this.generateExcelFileGeneral(worksheet, generalData);
+      }
+      this.logStep(`(3.6)  Generate general excel`, this.logTime(startTime));
+
+      // Generate file excel - main data
+      this.generateExcelFile(
+        worksheet,
+        processData,
+        configSheet,
+        totalTableHeight,
+      );
+      this.logStep(`(3.7)  Generate main excel`, this.logTime(startTime));
+
+      // // Remove template range
+      // this.generateExcelFile(worksheet, processData, configSheet);
       // this.logger.log(
-      //   `\t\t(3.3)  Calculate total table height => Done ${this.logTime(
-      //     startTime,
-      //   )}`,
+      //   `(3.5)  Generate main excel => Done ${this.logTime(startTime)}`,
       // );
-      //
-      // // Generate file excel - general data
-      // if (generalData) {
-      //   this.generateExcelFileGeneral(worksheet, generalData);
-      // }
-      // this.logger.log(
-      //   `\t\t(3.4)  Generate general excel => Done ${this.logTime(startTime)}`,
-      // );
-      //
-      // // Generate file excel - main data
-      // this.generateExcelFile();
-      // this.logger.log(
-      //   `\t\t(3.5)  Generate main excel => Done ${this.logTime(startTime)}`,
-      // );
-      //
+
       // // Merge cell
       // this.logger.log(
-      //   `\t\t(3.6)  Merge cell => Done ${this.logTime(startTime)}`,
+      //   `(3.6)  Merge cell => Done ${this.logTime(startTime)}`,
       // );
     }
 
     // Remove sheet config
     this.removeSheetConfig(workbook);
-    this.logger.log(
-      `\t(4)  Remove sheet config => Done ${this.logTime(startTime)}`,
-    );
+    this.logStep(`(4)  Remove sheet config`, this.logTime(startTime));
 
     // Save file
     const filePath = `results/${fileCode}_${this.utilService.generateUUIDv7()}.xlsx`;
     await workbook.xlsx.writeFile(filePath);
-    this.logger.log(`\t(5)  Save file => Done ${this.logTime(startTime)}`);
+    this.logStep(`(5)  Save file`, this.logTime(startTime));
+
+    this.logger.log(`\tResult => Path file: ${filePath}`);
+    this.logger.log(
+      `\tResult => Total time: ${(performance.now() - beginTime).toFixed(3)} ms`,
+    );
 
     this.logger.log(`-------- End export --------`);
-    return '';
+    return filePath;
   }
 
   // Read file template
@@ -391,7 +404,7 @@ export class ExportService {
 
         const childConfigRange = selectedConfigRange.children;
         this.processDataRecursive(
-          newDataRow.dataLevelTable!,
+          newDataRow.dataLevelTable,
           level + 1,
           childConfigRange,
           dataItem,
@@ -521,7 +534,7 @@ export class ExportService {
         const childConfigRange = selectedConfigRange.children;
         if (childConfigRange.length > 0) {
           this.processDataRecursive(
-            selectedDataTable.data[0].dataLevelTable!,
+            selectedDataTable.data[0].dataLevelTable,
             level + 1,
             childConfigRange,
             dataItem,
@@ -546,12 +559,204 @@ export class ExportService {
         const selectedCell = selectedRow.getCell(j);
 
         // Generate data
-        this.replaceText(selectedCell, generalData);
+        this.replaceText(selectedCell, generalData, 'general');
       }
     }
   }
 
-  private generateExcelFile(): void {}
+  private generateExcelFile(
+    worksheet: Excel.Worksheet,
+    processData: DataTableLevel,
+    configSheet: ConfigSheet,
+    totalTableHeight: number,
+  ): void {
+    if (totalTableHeight <= 0) {
+      return;
+    }
+
+    const startRow =
+      Number(
+        worksheet.getCell(
+          configSheet.ranges[configSheet.ranges.length - 1].endCell,
+        ).row,
+      ) + 1;
+
+    this.generateExcelFileRecursive(
+      startRow,
+      worksheet,
+      configSheet.ranges,
+      processData.dataTables,
+      0,
+    );
+  }
+
+  private generateExcelFileRecursive(
+    startRow: number,
+    worksheet: Excel.Worksheet,
+    configRanges: ConfigRange[],
+    dataTables: DataTable[],
+    level: number,
+  ): number {
+    let totalAppendRow = 0;
+
+    // Loop all data tables
+    for (const [indexConfigRange, configRange] of configRanges.entries()) {
+      let selectedDataTable: DataTable | undefined;
+      const tableConfig = configRange.table;
+      if (tableConfig) {
+        // Find data table for this config range
+        selectedDataTable = dataTables.find((e) => e.key === tableConfig.data);
+      } else {
+        selectedDataTable = dataTables[0];
+      }
+
+      // Check data table not found
+      if (selectedDataTable != null) {
+        // loop all rowData in dataTable
+        for (const dataRow of selectedDataTable.data) {
+          // generate for highest row (leaf)
+          if (configRange.children.length === 0) {
+            const beginRowTemplate = Number(
+              worksheet.getCell(configRange.beginCell).row,
+            );
+            const endRowTemplate = Number(
+              worksheet.getCell(configRange.endCell).row,
+            );
+
+            const highRow = endRowTemplate - beginRowTemplate + 1;
+
+            this.copyRows(
+              worksheet,
+              beginRowTemplate,
+              endRowTemplate,
+              startRow + totalAppendRow,
+            );
+
+            // Fill data
+            this.replaceTextRange(
+              worksheet,
+              startRow + totalAppendRow,
+              startRow + totalAppendRow + highRow,
+              dataRow.data,
+              'table',
+            );
+
+            // Increase start row for next data row
+            totalAppendRow += highRow;
+          }
+
+          // generate for sub data row (branch)
+          if (configRange.children.length !== 0) {
+            let beginRowNumber: number | undefined;
+            let endRowNumber: number | undefined;
+
+            // generate begin to begin child
+            {
+              const beginRowTemplate = Number(
+                worksheet.getCell(configRange.beginCell).row,
+              );
+              const beginRowChildTemplate = Number(
+                worksheet.getCell(configRange.children[0].beginCell).row,
+              );
+
+              const highRow = beginRowChildTemplate - beginRowTemplate;
+
+              beginRowNumber = startRow + totalAppendRow;
+
+              if (highRow > 0) {
+                this.copyRows(
+                  worksheet,
+                  beginRowTemplate,
+                  beginRowChildTemplate - 1,
+                  startRow + totalAppendRow,
+                );
+
+                totalAppendRow += highRow;
+              }
+            }
+
+            // recursive - generate child row
+            {
+              const childRowNum = this.generateExcelFileRecursive(
+                startRow + totalAppendRow,
+                worksheet,
+                configRange.children,
+                dataRow.dataLevelTable.dataTables,
+                level + 1,
+              );
+
+              totalAppendRow += childRowNum;
+            }
+
+            // generate end last child to end row
+            {
+              const endRowTemplate = Number(
+                worksheet.getCell(configRange.endCell).row,
+              );
+              const endRowChildTemplate = Number(
+                worksheet.getCell(
+                  configRange.children[configRange.children.length - 1].endCell,
+                ).row,
+              );
+
+              const highRow = endRowTemplate - endRowChildTemplate;
+
+              endRowNumber = startRow + totalAppendRow + highRow;
+
+              if (highRow > 0) {
+                this.copyRows(
+                  worksheet,
+                  endRowChildTemplate + 1,
+                  endRowTemplate,
+                  startRow + totalAppendRow,
+                );
+
+                totalAppendRow += highRow;
+              }
+            }
+
+            // fill data ...
+            if (beginRowNumber && endRowNumber) {
+              this.replaceTextRange(
+                worksheet,
+                beginRowNumber,
+                endRowNumber,
+                dataRow.data,
+                'table',
+              );
+            }
+          }
+        }
+      }
+
+      // generate space between two datatable - skip last dataTable
+      if (indexConfigRange < configRanges.length - 1) {
+        const nextRangeConfig = configRanges[indexConfigRange + 1];
+
+        const endRowRangeTemplate = Number(
+          worksheet.getCell(configRange.endCell).row,
+        );
+        const startNextRowRangeTemplate = Number(
+          worksheet.getCell(nextRangeConfig.beginCell).row,
+        );
+
+        const highRow = startNextRowRangeTemplate - endRowRangeTemplate - 1;
+
+        if (highRow > 0) {
+          this.copyRows(
+            worksheet,
+            endRowRangeTemplate + 1,
+            startNextRowRangeTemplate - 1,
+            startRow + totalAppendRow,
+          );
+
+          totalAppendRow += highRow;
+        }
+      }
+    }
+
+    return totalAppendRow;
+  }
 
   private logTime(time: { startTime: number }): string {
     const currentTime = performance.now();
@@ -564,20 +769,44 @@ export class ExportService {
       minimumFractionDigits: 3,
       maximumFractionDigits: 3,
     });
-    return `${formattedTime}ms`;
+    return `${formattedTime} ms`;
   }
 
-  private replaceText(cell: Excel.Cell, data: DataValue): void {
+  private replaceTextRange(
+    worksheet: Excel.Worksheet,
+    startRow: number,
+    endRow: number,
+    data: DataValue,
+    template: 'general' | 'table' | 'merge',
+  ): void {
+    for (let i = startRow; i <= endRow; i++) {
+      const selectedRow = worksheet.getRow(i);
+      const cellNumber = selectedRow.cellCount;
+
+      for (let j = 1; j <= cellNumber; j++) {
+        const selectedCell = selectedRow.getCell(j);
+
+        // Generate data
+        this.replaceText(selectedCell, data, template);
+      }
+    }
+  }
+
+  private replaceText(
+    cell: Excel.Cell,
+    data: DataValue,
+    template: 'general' | 'table' | 'merge',
+  ): void {
     const cellValue = cell.value;
 
     // Template string like <#general.NAME>
     if (typeof cellValue === 'string') {
-      const regex = /<#general\.(.*?)>/g;
+      const regex = new RegExp(`<#${template}.[^>]+>`, 'g');
       const matches = cellValue.match(regex);
 
       if (matches) {
         for (const match of matches) {
-          const key = match.replace(/<#general\./, '').replace(/>/, '');
+          const key = match.replace(`<#${template}.`, '').replace('>', '');
           const value = data[key];
 
           if (value !== undefined) {
@@ -761,5 +990,46 @@ export class ExportService {
     }
 
     return listMergeCells;
+  }
+
+  private insertEmptyRows(
+    worksheet: Excel.Worksheet,
+    height: number,
+    configSheet: ConfigSheet,
+  ): void {
+    const arrSteps: number[] = [];
+
+    // Split when height > 50000
+    if (height > 100000) {
+      const step = Math.floor(height / 100000);
+      for (let i = 0; i < step; i++) {
+        arrSteps.push(100000);
+      }
+
+      const lastStep = height - step * 100000;
+      if (lastStep > 0) {
+        arrSteps.push(lastStep);
+      }
+    } else {
+      arrSteps.push(height);
+    }
+
+    // Insert empty rows
+    if (arrSteps.length > 0) {
+      const startRow = Number(
+        worksheet.getCell(
+          configSheet.ranges[configSheet.ranges.length - 1].endCell,
+        ).row,
+      );
+      for (const step of arrSteps) {
+        worksheet.insertRows(startRow + 1, new Array(step), 'empty');
+      }
+    }
+  }
+
+  private logStep(message: string, time: string) {
+    const s1 = message.padEnd(50, '.');
+    const s2 = time.padStart(15, ' ');
+    this.logger.log(`${s1} => ${s2}`);
   }
 }

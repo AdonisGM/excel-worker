@@ -12,8 +12,18 @@ export class ExportController {
     @Body(new ZodValidationPipe(testSchema)) testDto: TestDto,
   ) {
     const { code, data } = testDto;
-    const a = await this.exportService.processExport(code, data);
 
-    return {};
+    // for (let i = 0; i < 500; i++) {
+    const pathFile = await this.exportService.processExport(code, data);
+    //   console.log('pathFile', pathFile);
+    // }
+
+    return {
+      status: 'success',
+      message: 'Export processed successfully',
+      data: {
+        pathFile,
+      },
+    };
   }
 }
