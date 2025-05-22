@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { Injectable } from '@nestjs/common';
 import { LoggerService } from '../logger/logger.service';
 import * as fs from 'node:fs';
@@ -14,10 +15,11 @@ import {
   DataValue,
 } from './export.type';
 import { UtilService } from '../util/util.service';
-import * as assert from 'node:assert';
 
 @Injectable()
 export class ExportService {
+  private testNumber = 0;
+
   constructor(
     private readonly logger: LoggerService,
     private readonly utilService: UtilService,
@@ -70,6 +72,8 @@ export class ExportService {
       const processData = this.processData(configSheet, data[index]);
       this.logStep(`(3.2)  Process data`, this.logTime(startTime));
 
+      this.logger.log(JSON.stringify(processData));
+
       // Get worksheet
       const worksheet = workbook.worksheets[index];
 
@@ -105,8 +109,13 @@ export class ExportService {
         processData,
         configSheet,
         totalTableHeight,
+        mergeCells,
       );
       this.logStep(`(3.7)  Generate main excel`, this.logTime(startTime));
+
+      // Generate file excel - main data
+      this.removeTemplateRange(worksheet, configSheet);
+      this.logStep(`(3.8)  Remove template range`, this.logTime(startTime));
 
       // // Remove template range
       // this.generateExcelFile(worksheet, processData, configSheet);
@@ -250,6 +259,11 @@ export class ExportService {
                   column: tableColumn,
                   data: tableData,
                 };
+              } else {
+                configRangeTable = {
+                  column: undefined,
+                  data: undefined,
+                };
               }
 
               const newRangeConfig: ConfigRange = {
@@ -339,207 +353,60 @@ export class ExportService {
   private processDataRecursive(
     dataLevelTable: DataTableLevel,
     level: number,
-    configRange: ConfigRange[],
+    configRanges: ConfigRange[],
     dataItem: DataValue,
   ): void {
-    // Check data level table has multiple table config
-    const configRangeTable = configRange[0].table;
-    if (configRangeTable) {
-      const tableColumn = configRangeTable.column;
+    // check range has index table excel
+    const configRange = configRanges[0];
+    if (configRange.table.column) {
+      const dataTableKey = configRange.table.data;
 
-      const dataKey = String(dataItem[tableColumn]);
-      const isHasDataKey = dataLevelTable.setDataTable.has(dataKey);
+      // Find dataTable with same dataTableKey
+      let selectedDataTable = dataLevelTable.dataTables.find((e) => {
+        return e.key === dataTableKey;
+      });
 
-      // Check data key is existing
-      let selectedDataTable: DataTable | undefined;
-      if (isHasDataKey) {
-        selectedDataTable = dataLevelTable.dataTables.find(
-          (e) => e.key === dataKey,
-        )!;
-      } else {
-        // Create new data table
+      // if not exist dataTable => create new
+      if (!selectedDataTable) {
         selectedDataTable = {
-          key: dataKey,
+          key: dataTableKey,
           setData: new Set<string>(),
           data: [],
-        };
+        } as DataTable;
 
-        // Add new data table to data level table
         dataLevelTable.dataTables.push(selectedDataTable);
-        dataLevelTable.setDataTable.add(dataKey);
       }
 
-      // Get config range table
-      const selectedConfigRange = configRange.find(
-        (e) => e.table?.data === dataKey,
-      )!;
+      // Find current range config
+      const selectedConfigRange = configRanges.find((e) => {
+        return e.table.data === dataTableKey;
+      })!;
 
-      const childDataLevelTable: DataTableLevel = {
-        level: level + 1,
-        dataTables: [],
-        setDataTable: new Set<string>(),
-      };
-
-      // Create new data row
-      const newDataRow: DataRow = {
-        data: dataItem,
-        dataLevelTable: childDataLevelTable,
-      };
-
-      // Process deep level
-      if (selectedConfigRange.columns.length === 0) {
-        // Add new data row to data table
-        selectedDataTable.data.push(newDataRow);
-      } else {
-        // Generate key for data row
-        const dataRowKey = selectedConfigRange.columns
-          .map((column) => String(dataItem[column]))
-          .join('--|--');
-
-        if (!selectedDataTable.setData.has(dataRowKey)) {
-          selectedDataTable.setData.add(dataRowKey);
-
-          selectedDataTable.data.push(newDataRow);
-        }
-
-        const childConfigRange = selectedConfigRange.children;
-        this.processDataRecursive(
-          newDataRow.dataLevelTable,
-          level + 1,
-          childConfigRange,
-          dataItem,
-        );
-      }
-    } else {
-      // If you don't have table config => Only one range config
-      const selectedConfigRange = configRange[0];
       const columns = selectedConfigRange.columns;
 
-      // leaf node
+      // Check and process with no group column => leaf data
       if (columns.length === 0) {
-        let selectedDataTable: DataTable | undefined;
+        const newDataRow = {
+          dataLevelTable: {
+            level: level,
+            dataTables: [],
+            setDataTable: new Set<string>(),
+          },
+          data: dataItem,
+        } as DataRow;
 
-        if (dataLevelTable.dataTables.length === 0) {
-          // Create new data table
-          selectedDataTable = {
-            key: 'default',
-            setData: new Set<string>(),
-            data: [],
-          };
-
-          // Create new data row
-          const newDataRow: DataRow = {
-            data: dataItem,
-            dataLevelTable: {
-              level: level + 1,
-              dataTables: [],
-              setDataTable: new Set<string>(),
-            },
-          };
-
-          selectedDataTable.data.push(newDataRow);
-          dataLevelTable.dataTables.push(selectedDataTable);
-        } else {
-          // Check data key is existing
-          selectedDataTable = dataLevelTable.dataTables[0];
-
-          // Create new data row
-          const newDataRow: DataRow = {
-            data: dataItem,
-            dataLevelTable: {
-              level: level + 1,
-              dataTables: [],
-              setDataTable: new Set<string>(),
-            },
-          };
-
-          // Add new data row to data table
-          selectedDataTable.data.push(newDataRow);
-        }
+        selectedDataTable.data.push(newDataRow);
       } else {
-        // Generate key for data row
-        const dataRowKey = selectedConfigRange.columns
-          .map((column) => String(dataItem[column]))
-          .join('--|--');
+        // get key from itemData and currentRangeConfig
+        const keyDataRow = columns.join('--|--');
 
-        if (selectedConfigRange.columns.length === 0) {
-          // Create new DataTable
-          const newDataTable: DataTable = {
-            key: dataRowKey,
-            setData: new Set<string>(),
-            data: [],
-          };
-
-          // Create new data row
-          const newDataRow: DataRow = {
-            data: dataItem,
-            dataLevelTable: {
-              level: level + 1,
-              dataTables: [],
-              setDataTable: new Set<string>(),
-            },
-          };
-
-          newDataTable.data.push(newDataRow);
-          dataLevelTable.dataTables.push(newDataTable);
-        } else {
-          // Check data key is existing
-          const selectedDataTable = dataLevelTable.dataTables[0];
-
-          if (!selectedDataTable) {
-            // Create new data table
-            const newDataTable: DataTable = {
-              key: dataRowKey,
-              setData: new Set<string>(),
-              data: [],
-            };
-
-            // Create new data row
-            const newDataRow: DataRow = {
-              data: dataItem,
-              dataLevelTable: {
-                level: level + 1,
-                dataTables: [],
-                setDataTable: new Set<string>(),
-              },
-            };
-
-            newDataTable.data.push(newDataRow);
-            newDataTable.setData.add(dataRowKey);
-            dataLevelTable.dataTables.push(newDataTable);
-          } else {
-            const selectedDataTable = dataLevelTable.dataTables[0];
-
-            if (!selectedDataTable.setData.has(dataRowKey)) {
-              selectedDataTable.setData.add(dataRowKey);
-
-              // Create new data row
-              const newDataRow: DataRow = {
-                data: dataItem,
-                dataLevelTable: {
-                  level: level + 1,
-                  dataTables: [],
-                  setDataTable: new Set<string>(),
-                },
-              };
-
-              // Add new data row to data table
-              selectedDataTable.data.push(newDataRow);
-            }
-          }
+        if (selectedDataTable.setData.has(keyDataRow)) {
+          // selectedDataTable.
+          // Create new rowData
         }
 
-        // Process deep level
-        const selectedDataTable = dataLevelTable.dataTables[0];
-        const childConfigRange = selectedConfigRange.children;
-        if (childConfigRange.length > 0) {
-          this.processDataRecursive(
-            selectedDataTable.data[0].dataLevelTable,
-            level + 1,
-            childConfigRange,
-            dataItem,
-          );
-        }
+        // prepare param for recursive call
+        // recursive call
       }
     }
   }
@@ -569,6 +436,7 @@ export class ExportService {
     processData: DataTableLevel,
     configSheet: ConfigSheet,
     totalTableHeight: number,
+    mergeCells: Map<string, CMergeCell>,
   ): void {
     if (totalTableHeight <= 0) {
       return;
@@ -587,6 +455,7 @@ export class ExportService {
       configSheet.ranges,
       processData.dataTables,
       0,
+      mergeCells,
     );
   }
 
@@ -596,6 +465,7 @@ export class ExportService {
     configRanges: ConfigRange[],
     dataTables: DataTable[],
     level: number,
+    mergeCells: Map<string, CMergeCell>,
   ): number {
     let totalAppendRow = 0;
 
@@ -630,6 +500,7 @@ export class ExportService {
               beginRowTemplate,
               endRowTemplate,
               startRow + totalAppendRow,
+              mergeCells,
             );
 
             // Fill data
@@ -669,6 +540,7 @@ export class ExportService {
                   beginRowTemplate,
                   beginRowChildTemplate - 1,
                   startRow + totalAppendRow,
+                  mergeCells,
                 );
 
                 totalAppendRow += highRow;
@@ -683,6 +555,7 @@ export class ExportService {
                 configRange.children,
                 dataRow.dataLevelTable.dataTables,
                 level + 1,
+                mergeCells,
               );
 
               totalAppendRow += childRowNum;
@@ -709,6 +582,7 @@ export class ExportService {
                   endRowChildTemplate + 1,
                   endRowTemplate,
                   startRow + totalAppendRow,
+                  mergeCells,
                 );
 
                 totalAppendRow += highRow;
@@ -748,6 +622,7 @@ export class ExportService {
             endRowRangeTemplate + 1,
             startNextRowRangeTemplate - 1,
             startRow + totalAppendRow,
+            mergeCells,
           );
 
           totalAppendRow += highRow;
@@ -953,6 +828,7 @@ export class ExportService {
     sourceStartRow: number,
     sourceEndRow: number,
     targetStartRow: number,
+    mergeCells: Map<string, CMergeCell>,
   ) {
     const rowCount = sourceEndRow - sourceStartRow + 1;
     for (let i = 0; i < rowCount; i++) {
@@ -961,7 +837,47 @@ export class ExportService {
       this.copyRow(worksheet, sourceRowNum, targetRowNum);
     }
 
-    // Process merge cells
+    // Get list merge cells in sheet
+    const setMergeSell = new Set<string>();
+    for (let rowIndex = sourceStartRow; rowIndex <= sourceEndRow; rowIndex++) {
+      const row = worksheet.getRow(rowIndex);
+      const maxCol = row.cellCount;
+      for (let colIndex = 1; colIndex <= maxCol; colIndex++) {
+        const cell = row.getCell(colIndex);
+
+        const isMerged = cell.isMerged;
+        if (isMerged) {
+          const masterCell = cell.master.address;
+          setMergeSell.add(masterCell);
+        }
+      }
+    }
+
+    // Process each merge cell
+    for (const mergeKey of setMergeSell) {
+      const mergeCell = mergeCells.get(mergeKey);
+
+      if (mergeCell) {
+        const mBeginRow = targetStartRow - sourceStartRow + mergeCell.top;
+        const mEndRow = targetStartRow - sourceStartRow + mergeCell.bottom;
+        const mBeginCol = mergeCell.left;
+        const mEndCol = mergeCell.right;
+
+        const master = worksheet.getCell(mBeginRow, mBeginCol);
+
+        for (let rowIndex = mBeginRow; rowIndex <= mEndRow; rowIndex++) {
+          const row = worksheet.getRow(rowIndex);
+          for (let colIndex = mBeginCol; colIndex <= mEndCol; colIndex++) {
+            const cell = row.getCell(colIndex);
+
+            if (cell.address === master.address) {
+              continue;
+            }
+            cell.merge(master);
+          }
+        }
+      }
+    }
   }
 
   private getListMergeCells(
@@ -1027,9 +943,54 @@ export class ExportService {
     }
   }
 
+  private removeTemplateRange(
+    worksheet: Excel.Worksheet,
+    configSheet: ConfigSheet,
+  ) {
+    const startRow = Number(
+      worksheet.getCell(configSheet.ranges[0].beginCell).row,
+    );
+    const endRow = Number(
+      worksheet.getCell(
+        configSheet.ranges[configSheet.ranges.length - 1].endCell,
+      ).row,
+    );
+
+    const rowCount = endRow - startRow + 1;
+
+    for (let i = 0; i < rowCount; i++) {
+      const rowNumber = startRow + i;
+      const row = worksheet.getRow(rowNumber);
+      row.values = [];
+      row.commit();
+    }
+
+    // worksheet.spliceRows(startRow, rowCount);
+  }
+
   private logStep(message: string, time: string) {
     const s1 = message.padEnd(50, '.');
     const s2 = time.padStart(15, ' ');
     this.logger.log(`${s1} => ${s2}`);
+  }
+
+  public async test() {
+    // const workbook = await this.readFileTemplate(
+    //   'temp_0196f62a-2339-73ef-8991-796541be6dae',
+    // );
+    // const worksheet = workbook.worksheets[0];
+    //
+    // worksheet.mergeCells(8, 1, 9, 1);
+    //
+    // this.saveTempFile(worksheet);
+
+    this.testNumber = this.testNumber + 1;
+
+    return this.testNumber;
+  }
+
+  private saveTempFile(worksheet: Excel.Worksheet) {
+    const filePath = `results/temp_${this.utilService.generateUUIDv7()}.xlsx`;
+    worksheet.workbook.xlsx.writeFile(filePath);
   }
 }

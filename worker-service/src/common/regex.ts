@@ -1,3 +1,5 @@
+// Author: AdonisGM - Nguyen Manh Tung
+
 /**
  * Check if the url is a valid url
  *

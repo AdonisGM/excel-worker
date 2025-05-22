@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { LoggerService } from './models/logger/logger.service';

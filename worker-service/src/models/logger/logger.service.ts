@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { Injectable } from '@nestjs/common';
 import * as winston from 'winston';
 import 'winston-daily-rotate-file';

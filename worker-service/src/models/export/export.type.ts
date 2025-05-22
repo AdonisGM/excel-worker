@@ -17,12 +17,12 @@ export type ConfigRange = {
   endCell: string;
   columns: string[];
   children: ConfigRange[];
-  table: ConfigRangeTable | undefined;
+  table: ConfigRangeTable;
 };
 
 export type ConfigRangeTable = {
-  column: string;
-  data: string;
+  column: string | undefined;
+  data: string | undefined;
 };
 
 // Type data

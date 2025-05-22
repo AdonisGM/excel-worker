@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { Body, Controller, Post } from '@nestjs/common';
 import { ExportService } from './export.service';
 import { ZodValidationPipe } from '../../zod/zod.pipe';
@@ -24,6 +25,16 @@ export class ExportController {
       data: {
         pathFile,
       },
+    };
+  }
+
+  @Post('test/temp')
+  async processExportTemp() {
+    const a = await this.exportService.test();
+
+    return {
+      status: 'success',
+      a: a,
     };
   }
 }

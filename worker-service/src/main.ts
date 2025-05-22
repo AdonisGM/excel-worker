@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { subDomainCheck } from './common/regex';
