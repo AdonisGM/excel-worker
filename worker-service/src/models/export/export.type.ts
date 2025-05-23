@@ -41,6 +41,7 @@ export type DataTable = {
 export type DataRow = {
   dataLevelTable: DataTableLevel;
   data: DataValue;
+  key: string | undefined;
 };
 
 export type DataValue = { [key: string]: string | number | null | undefined };

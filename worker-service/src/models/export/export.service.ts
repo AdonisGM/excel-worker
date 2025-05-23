@@ -392,6 +392,7 @@ export class ExportService {
             dataTables: [],
             setDataTable: new Set<string>(),
           },
+          key: undefined,
           data: dataItem,
         } as DataRow;
 
@@ -400,13 +401,140 @@ export class ExportService {
         // get key from itemData and currentRangeConfig
         const keyDataRow = columns.join('--|--');
 
-        if (selectedDataTable.setData.has(keyDataRow)) {
-          // selectedDataTable.
+        if (!selectedDataTable.setData.has(keyDataRow)) {
+          selectedDataTable.setData.add(keyDataRow);
+
           // Create new rowData
+          const newDataRow = {
+            dataLevelTable: {
+              level: level,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
+            key: keyDataRow,
+            data: dataItem,
+          } as DataRow;
+
+          selectedDataTable.data.push(newDataRow);
         }
 
         // prepare param for recursive call
+        const rLevelDataTable = selectedDataTable.data.find(
+          (e) => e.key === keyDataRow,
+        )!.dataLevelTable;
+
         // recursive call
+        this.processDataRecursive(
+          rLevelDataTable,
+          level + 1,
+          selectedConfigRange.children,
+          dataItem,
+        );
+      }
+    } else {
+      // if current range config don't had index table excel => have only once element in ArrayList
+      const columns = configRanges[0].columns;
+
+      // Check and process with no group column => leaf data
+      if (columns.length === 0) {
+        const dataTables = dataLevelTable.dataTables;
+
+        // check if empty list, add new data table
+        if (dataTables.length === 0) {
+          const newDataTable = {
+            key: 'dataTable_0',
+            setData: new Set<string>(),
+            data: [],
+          } as DataTable;
+          const newDataRow = {
+            dataLevelTable: {
+              level: level,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
+            key: undefined,
+            data: dataItem,
+          } as DataRow;
+
+          newDataTable.data.push(newDataRow);
+
+          dataLevelTable.dataTables.push(newDataTable);
+        } else {
+          // get exist data table and add new row data
+          const selectedDataTable = dataTables[0];
+
+          const newDataRow = {
+            dataLevelTable: {
+              level: level,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
+            key: undefined,
+            data: dataItem,
+          } as DataRow;
+
+          selectedDataTable.data.push(newDataRow);
+        }
+      } else {
+        const dataTables = dataLevelTable.dataTables;
+
+        // get key from itemData and currentRangeConfig
+        const keyDataRow = columns.join('--|--');
+
+        // check if empty list, add new data table
+        if (dataTables.length === 0) {
+          const newDataTable = {
+            key: 'dataTable_0',
+            setData: new Set<string>(),
+            data: [],
+          } as DataTable;
+          const newDataRow = {
+            dataLevelTable: {
+              level: level,
+              dataTables: [],
+              setDataTable: new Set<string>(),
+            },
+            key: keyDataRow,
+            data: dataItem,
+          } as DataRow;
+
+          newDataTable.data.push(newDataRow);
+          newDataTable.setData.add(keyDataRow);
+
+          dataLevelTable.dataTables.push(newDataTable);
+        } else {
+          // get exist data table and add new row data
+          const selectedDataTable = dataTables[0];
+
+          if (!selectedDataTable.setData.has(keyDataRow)) {
+            selectedDataTable.setData.add(keyDataRow);
+
+            const newDataRow = {
+              dataLevelTable: {
+                level: level,
+                dataTables: [],
+                setDataTable: new Set<string>(),
+              },
+              key: keyDataRow,
+              data: dataItem,
+            } as DataRow;
+
+            selectedDataTable.data.push(newDataRow);
+          }
+        }
+
+        // prepare param for recursive call
+        const rLevelDataTable = dataTables[0].data.find(
+          (e) => e.key === keyDataRow,
+        )!.dataLevelTable;
+
+        // recursive call
+        this.processDataRecursive(
+          rLevelDataTable,
+          level + 1,
+          configRanges[0].children,
+          dataItem,
+        );
       }
     }
   }
