@@ -18,8 +18,6 @@ import { UtilService } from '../util/util.service';
 
 @Injectable()
 export class ExportService {
-  private testNumber = 0;
-
   constructor(
     private readonly logger: LoggerService,
     private readonly utilService: UtilService,
@@ -72,8 +70,6 @@ export class ExportService {
       const processData = this.processData(configSheet, data[index]);
       this.logStep(`(3.2)  Process data`, this.logTime(startTime));
 
-      this.logger.log(JSON.stringify(processData));
-
       // Get worksheet
       const worksheet = workbook.worksheets[index];
 
@@ -117,12 +113,6 @@ export class ExportService {
       this.removeTemplateRange(worksheet, configSheet);
       this.logStep(`(3.8)  Remove template range`, this.logTime(startTime));
 
-      // // Remove template range
-      // this.generateExcelFile(worksheet, processData, configSheet);
-      // this.logger.log(
-      //   `(3.5)  Generate main excel => Done ${this.logTime(startTime)}`,
-      // );
-
       // // Merge cell
       // this.logger.log(
       //   `(3.6)  Merge cell => Done ${this.logTime(startTime)}`,
@@ -135,7 +125,10 @@ export class ExportService {
 
     // Save file
     const filePath = `results/${fileCode}_${this.utilService.generateUUIDv7()}.xlsx`;
-    await workbook.xlsx.writeFile(filePath);
+    const buffer = await workbook.xlsx.writeBuffer({
+      useSharedStrings: false,
+    });
+    fs.writeFileSync(filePath, Buffer.from(buffer));
     this.logStep(`(5)  Save file`, this.logTime(startTime));
 
     this.logger.log(`\tResult => Path file: ${filePath}`);
@@ -277,7 +270,6 @@ export class ExportService {
 
               const configRanges: ConfigRange[] = sheetConfig.ranges;
               this.getConfigWorkbookRecursive(configRanges, newRangeConfig, 0);
-              // sheetConfig.ranges.push(newRangeConfig);
             }
           }
         }
@@ -333,7 +325,6 @@ export class ExportService {
     const dataTableLevel: DataTableLevel = {
       level: 0,
       dataTables: [],
-      setDataTable: new Set<string>(),
     };
 
     // Loop all data
@@ -359,7 +350,11 @@ export class ExportService {
     // check range has index table excel
     const configRange = configRanges[0];
     if (configRange.table.column) {
-      const dataTableKey = configRange.table.data;
+      const column = configRange.table.column;
+      const columnData = dataItem[column];
+      const dataTableKey = configRanges.find(
+        (e) => e.table.data === columnData,
+      )!.table.data;
 
       // Find dataTable with same dataTableKey
       let selectedDataTable = dataLevelTable.dataTables.find((e) => {
@@ -390,7 +385,6 @@ export class ExportService {
           dataLevelTable: {
             level: level,
             dataTables: [],
-            setDataTable: new Set<string>(),
           },
           key: undefined,
           data: dataItem,
@@ -399,7 +393,9 @@ export class ExportService {
         selectedDataTable.data.push(newDataRow);
       } else {
         // get key from itemData and currentRangeConfig
-        const keyDataRow = columns.join('--|--');
+        const keyDataRow = columns
+          .map((e) => String(dataItem[e]))
+          .join('--|--');
 
         if (!selectedDataTable.setData.has(keyDataRow)) {
           selectedDataTable.setData.add(keyDataRow);
@@ -409,7 +405,6 @@ export class ExportService {
             dataLevelTable: {
               level: level,
               dataTables: [],
-              setDataTable: new Set<string>(),
             },
             key: keyDataRow,
             data: dataItem,
@@ -450,7 +445,6 @@ export class ExportService {
             dataLevelTable: {
               level: level,
               dataTables: [],
-              setDataTable: new Set<string>(),
             },
             key: undefined,
             data: dataItem,
@@ -467,7 +461,6 @@ export class ExportService {
             dataLevelTable: {
               level: level,
               dataTables: [],
-              setDataTable: new Set<string>(),
             },
             key: undefined,
             data: dataItem,
@@ -479,7 +472,9 @@ export class ExportService {
         const dataTables = dataLevelTable.dataTables;
 
         // get key from itemData and currentRangeConfig
-        const keyDataRow = columns.join('--|--');
+        const keyDataRow = columns
+          .map((e) => String(dataItem[e]))
+          .join('--|--');
 
         // check if empty list, add new data table
         if (dataTables.length === 0) {
@@ -492,7 +487,6 @@ export class ExportService {
             dataLevelTable: {
               level: level,
               dataTables: [],
-              setDataTable: new Set<string>(),
             },
             key: keyDataRow,
             data: dataItem,
@@ -513,7 +507,6 @@ export class ExportService {
               dataLevelTable: {
                 level: level,
                 dataTables: [],
-                setDataTable: new Set<string>(),
               },
               key: keyDataRow,
               data: dataItem,
@@ -600,10 +593,11 @@ export class ExportService {
     // Loop all data tables
     for (const [indexConfigRange, configRange] of configRanges.entries()) {
       let selectedDataTable: DataTable | undefined;
-      const tableConfig = configRange.table;
-      if (tableConfig) {
+      if (configRange.table.column) {
         // Find data table for this config range
-        selectedDataTable = dataTables.find((e) => e.key === tableConfig.data);
+        selectedDataTable = dataTables.find(
+          (e) => e.key === configRange.table.data,
+        );
       } else {
         selectedDataTable = dataTables[0];
       }
@@ -848,34 +842,32 @@ export class ExportService {
         worksheet.getCell(parentConfigRange.endCell).row,
       );
       const childLastRow = Number(
-        worksheet.getCell(configRanges[0].endCell).row,
+        worksheet.getCell(configRanges[configRanges.length - 1].endCell).row,
       );
       heightToBottomParent = parentLastRow - childLastRow;
     }
 
     let totalHeightBetweenDataTable = 0;
     // Check space between each data table - skip last data table
-    if (configRanges.length > 1) {
-      for (let i = 0; i < configRanges.length - 1; i++) {
-        const currentConfigRange = configRanges[i];
-        const nextConfigRange = configRanges[i + 1];
+    for (let i = 0; i < configRanges.length - 1; i++) {
+      const currentConfigRange = configRanges[i];
+      const nextConfigRange = configRanges[i + 1];
 
-        const lastRowCurrentDataTable = Number(
-          worksheet.getCell(currentConfigRange.endCell).row,
-        );
-        const firstRowNextDataTable = Number(
-          worksheet.getCell(nextConfigRange.beginCell).row,
-        );
+      const lastRowCurrentDataTable = Number(
+        worksheet.getCell(currentConfigRange.endCell).row,
+      );
+      const firstRowNextDataTable = Number(
+        worksheet.getCell(nextConfigRange.beginCell).row,
+      );
 
-        totalHeightBetweenDataTable +=
-          firstRowNextDataTable - lastRowCurrentDataTable;
-      }
+      totalHeightBetweenDataTable +=
+        firstRowNextDataTable - lastRowCurrentDataTable - 1;
     }
 
     let heightTotalChildClaimed = 0;
     // Calculate height of child claimed
     for (const configRange of configRanges) {
-      const keyDateRange = configRange.table?.data;
+      const keyDateRange = configRange.table.data;
       let selectedDataTable: DataTable | undefined;
 
       // If key data is null => only one dataTable
@@ -1093,28 +1085,13 @@ export class ExportService {
       row.commit();
     }
 
-    // worksheet.spliceRows(startRow, rowCount);
+    worksheet.spliceRows(startRow, rowCount);
   }
 
   private logStep(message: string, time: string) {
     const s1 = message.padEnd(50, '.');
     const s2 = time.padStart(15, ' ');
     this.logger.log(`${s1} => ${s2}`);
-  }
-
-  public async test() {
-    // const workbook = await this.readFileTemplate(
-    //   'temp_0196f62a-2339-73ef-8991-796541be6dae',
-    // );
-    // const worksheet = workbook.worksheets[0];
-    //
-    // worksheet.mergeCells(8, 1, 9, 1);
-    //
-    // this.saveTempFile(worksheet);
-
-    this.testNumber = this.testNumber + 1;
-
-    return this.testNumber;
   }
 
   private saveTempFile(worksheet: Excel.Worksheet) {

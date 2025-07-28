@@ -32,15 +32,6 @@ export class LoggerService {
       },
     );
 
-    const transport = new winston.transports.DailyRotateFile({
-      filename: '%DATE%/info-%DATE%.log',
-      datePattern: 'YYYY-MM-DD_HH',
-      zippedArchive: true,
-      maxSize: '50m',
-      maxFiles: '30d',
-      dirname: this.folderPath,
-    });
-
     this.logger = winston.createLogger({
       level: 'info',
       format: winston.format.combine(
@@ -48,7 +39,31 @@ export class LoggerService {
         winston.format.timestamp(),
         myFormat,
       ),
-      transports: [new winston.transports.Console(), transport],
+      transports: [
+        new winston.transports.Console(),
+        this.createTransports('info'),
+        this.createTransports('error'),
+        this.createTransports('warn'),
+        this.createTransports('debug'),
+        this.createTransports('verbose'),
+      ],
+    });
+  }
+
+  /**
+   * Create a winston transports
+   * @param {string} level - The level of the logger (e.g., 'info', 'error', 'warn', 'debug', 'verbose').
+   *
+   * @return {winston.Logger} - The winston logger instance.
+   */
+  public createTransports(level: string): winston.transport {
+    return new winston.transports.DailyRotateFile({
+      filename: `%DATE%/${level}-%DATE%.log`,
+      datePattern: 'YYYY-MM-DD_HH',
+      zippedArchive: true,
+      maxSize: '50m',
+      maxFiles: '30d',
+      dirname: this.folderPath,
     });
   }
 

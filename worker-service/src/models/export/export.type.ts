@@ -28,7 +28,6 @@ export type ConfigRangeTable = {
 // Type data
 export type DataTableLevel = {
   level: number;
-  setDataTable: Set<string>;
   dataTables: DataTable[];
 };
 

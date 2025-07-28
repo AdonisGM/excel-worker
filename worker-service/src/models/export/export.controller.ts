@@ -27,14 +27,4 @@ export class ExportController {
       },
     };
   }
-
-  @Post('test/temp')
-  async processExportTemp() {
-    const a = await this.exportService.test();
-
-    return {
-      status: 'success',
-      a: a,
-    };
-  }
 }
