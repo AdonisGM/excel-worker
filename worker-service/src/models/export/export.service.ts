@@ -100,23 +100,41 @@ export class ExportService {
       this.logStep(`(3.6)  Generate general excel`, this.logTime(startTime));
 
       // Generate file excel - main data
+      const listMergeCell: Set<string> = new Set<string>();
+      const cbSetListMergeCell = (rangeCells: string[]) => {
+        rangeCells.forEach((row) => {
+          if (row) {
+            listMergeCell.add(row);
+          }
+        });
+      };
       this.generateExcelFile(
         worksheet,
         processData,
         configSheet,
         totalTableHeight,
         mergeCells,
+        cbSetListMergeCell,
       );
       this.logStep(`(3.7)  Generate main excel`, this.logTime(startTime));
 
       // Generate file excel - main data
-      this.removeTemplateRange(worksheet, configSheet);
+      const countRowRemove = this.removeTemplateRange(worksheet, configSheet);
       this.logStep(`(3.8)  Remove template range`, this.logTime(startTime));
 
-      // // Merge cell
-      // this.logger.log(
-      //   `(3.6)  Merge cell => Done ${this.logTime(startTime)}`,
-      // );
+      // Merge cell
+      if (listMergeCell.size > 0) {
+        this.mergeCellAfterSliceRows(
+          worksheet,
+          configSheet,
+          countRowRemove,
+          listMergeCell,
+        );
+      }
+      this.logStep(
+        `(3.9)  Merge cell after spliceRows`,
+        this.logTime(startTime),
+      );
     }
 
     // Remove sheet config
@@ -558,6 +576,7 @@ export class ExportService {
     configSheet: ConfigSheet,
     totalTableHeight: number,
     mergeCells: Map<string, CMergeCell>,
+    cbSetListMergeCell: (rangeCells: string[]) => void,
   ): void {
     if (totalTableHeight <= 0) {
       return;
@@ -577,6 +596,7 @@ export class ExportService {
       processData.dataTables,
       0,
       mergeCells,
+      cbSetListMergeCell,
     );
   }
 
@@ -587,6 +607,7 @@ export class ExportService {
     dataTables: DataTable[],
     level: number,
     mergeCells: Map<string, CMergeCell>,
+    cbSetListMergeCell: (rangeCells: string[]) => void,
   ): number {
     let totalAppendRow = 0;
 
@@ -623,6 +644,7 @@ export class ExportService {
               endRowTemplate,
               startRow + totalAppendRow,
               mergeCells,
+              cbSetListMergeCell,
             );
 
             // Fill data
@@ -663,6 +685,7 @@ export class ExportService {
                   beginRowChildTemplate - 1,
                   startRow + totalAppendRow,
                   mergeCells,
+                  cbSetListMergeCell,
                 );
 
                 totalAppendRow += highRow;
@@ -678,6 +701,7 @@ export class ExportService {
                 dataRow.dataLevelTable.dataTables,
                 level + 1,
                 mergeCells,
+                cbSetListMergeCell,
               );
 
               totalAppendRow += childRowNum;
@@ -705,6 +729,7 @@ export class ExportService {
                   endRowTemplate,
                   startRow + totalAppendRow,
                   mergeCells,
+                  cbSetListMergeCell,
                 );
 
                 totalAppendRow += highRow;
@@ -745,6 +770,7 @@ export class ExportService {
             startNextRowRangeTemplate - 1,
             startRow + totalAppendRow,
             mergeCells,
+            cbSetListMergeCell,
           );
 
           totalAppendRow += highRow;
@@ -949,55 +975,38 @@ export class ExportService {
     sourceEndRow: number,
     targetStartRow: number,
     mergeCells: Map<string, CMergeCell>,
+    cbSetListMergeCell: (rangeCells: string[]) => void,
   ) {
     const rowCount = sourceEndRow - sourceStartRow + 1;
+    const listMergeCell: Set<string> = new Set<string>();
+
     for (let i = 0; i < rowCount; i++) {
       const sourceRowNum = sourceStartRow + i;
       const targetRowNum = targetStartRow + i;
       this.copyRow(worksheet, sourceRowNum, targetRowNum);
     }
 
-    // Get list merge cells in sheet
-    const setMergeSell = new Set<string>();
-    for (let rowIndex = sourceStartRow; rowIndex <= sourceEndRow; rowIndex++) {
-      const row = worksheet.getRow(rowIndex);
-      const maxCol = row.cellCount;
-      for (let colIndex = 1; colIndex <= maxCol; colIndex++) {
-        const cell = row.getCell(colIndex);
+    // Get the difference in row numbers
+    const diffRow = targetStartRow - sourceStartRow;
 
-        const isMerged = cell.isMerged;
-        if (isMerged) {
-          const masterCell = cell.master.address;
-          setMergeSell.add(masterCell);
-        }
+    // get list merge cells in range copy
+    mergeCells.forEach((cell) => {
+      if (sourceStartRow <= cell.top && cell.bottom <= sourceEndRow) {
+        const newTop = cell.top + diffRow;
+        const newBottom = cell.bottom + diffRow;
+        const newLeft = cell.left;
+        const newRight = cell.right;
+
+        const newBeginCell = worksheet.getCell(newTop, newLeft).address;
+        const newEndCell = worksheet.getCell(newBottom, newRight).address;
+
+        const mergeCell = `${newBeginCell}:${newEndCell}`;
+        listMergeCell.add(mergeCell);
       }
-    }
+    });
 
-    // Process each merge cell
-    for (const mergeKey of setMergeSell) {
-      const mergeCell = mergeCells.get(mergeKey);
-
-      if (mergeCell) {
-        const mBeginRow = targetStartRow - sourceStartRow + mergeCell.top;
-        const mEndRow = targetStartRow - sourceStartRow + mergeCell.bottom;
-        const mBeginCol = mergeCell.left;
-        const mEndCol = mergeCell.right;
-
-        const master = worksheet.getCell(mBeginRow, mBeginCol);
-
-        for (let rowIndex = mBeginRow; rowIndex <= mEndRow; rowIndex++) {
-          const row = worksheet.getRow(rowIndex);
-          for (let colIndex = mBeginCol; colIndex <= mEndCol; colIndex++) {
-            const cell = row.getCell(colIndex);
-
-            if (cell.address === master.address) {
-              continue;
-            }
-            cell.merge(master);
-          }
-        }
-      }
-    }
+    // Set list merge cell
+    cbSetListMergeCell(Array.from(listMergeCell));
   }
 
   private getListMergeCells(
@@ -1066,7 +1075,7 @@ export class ExportService {
   private removeTemplateRange(
     worksheet: Excel.Worksheet,
     configSheet: ConfigSheet,
-  ) {
+  ): number {
     const startRow = Number(
       worksheet.getCell(configSheet.ranges[0].beginCell).row,
     );
@@ -1086,6 +1095,47 @@ export class ExportService {
     }
 
     worksheet.spliceRows(startRow, rowCount);
+
+    return rowCount;
+  }
+
+  private mergeCellAfterSliceRows(
+    worksheet: Excel.Worksheet,
+    configSheet: ConfigSheet,
+    countRowRemove: number,
+    listMergeCell: Set<string>,
+  ) {
+    let mergeCells: string[] = Array.from(listMergeCell);
+
+    mergeCells = mergeCells.map((cell) => {
+      const [beginCell, endCell] = cell.split(':');
+      const beginCellAddress = worksheet.getCell(beginCell);
+      const endCellAddress = worksheet.getCell(endCell);
+
+      const top = Number(beginCellAddress.row) - countRowRemove;
+      const left = beginCellAddress.col;
+
+      const bottom = Number(endCellAddress.row) - countRowRemove;
+      const right = endCellAddress.col;
+
+      const newBeginCell = worksheet.getCell(top, left).address;
+      const newEndCell = worksheet.getCell(bottom, right).address;
+
+      return `${newBeginCell}:${newEndCell}`;
+    });
+
+    mergeCells = Array.from(new Set(mergeCells));
+
+    // unmerge all
+    worksheet.unMergeCells();
+
+    mergeCells.forEach((range, i, all) => {
+      // Check range is merge
+      if (!range || range.length === 0) {
+      }
+      worksheet.mergeCells(range);
+      this.logger.log(`${i}/${all.length}`);
+    });
   }
 
   private logStep(message: string, time: string) {
@@ -1096,6 +1146,6 @@ export class ExportService {
 
   private saveTempFile(worksheet: Excel.Worksheet) {
     const filePath = `results/temp_${this.utilService.generateUUIDv7()}.xlsx`;
-    worksheet.workbook.xlsx.writeFile(filePath);
+    worksheet.workbook.xlsx.writeFile(filePath).then().catch();
   }
 }
