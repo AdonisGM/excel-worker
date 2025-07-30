@@ -33,7 +33,6 @@ export class LoggerService {
     );
 
     this.logger = winston.createLogger({
-      level: 'info',
       format: winston.format.combine(
         winston.format.label({ label: 'AGM' }),
         winston.format.timestamp(),
@@ -58,6 +57,7 @@ export class LoggerService {
    */
   public createTransports(level: string): winston.transport {
     return new winston.transports.DailyRotateFile({
+      level: level,
       filename: `%DATE%/${level}-%DATE%.log`,
       datePattern: 'YYYY-MM-DD_HH',
       zippedArchive: true,

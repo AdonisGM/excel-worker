@@ -18,13 +18,30 @@ import { UtilService } from '../util/util.service';
 
 @Injectable()
 export class ExportService {
+  private readonly LIMIT_INSERT_EMPTY_ROW: number = 100000;
+
+  /**
+   * Constructor for ExportService
+   * @param logger
+   * @param utilService
+   */
   constructor(
     private readonly logger: LoggerService,
     private readonly utilService: UtilService,
   ) {}
 
-  // Process export
+  /**
+   * Process export data to Excel file.
+   * Run asynchronously to ensure all steps are completed before returning the file path.
+   *
+   * @param { string } referId - The reference ID for the export process, used for logging and tracking.
+   * @param { string } fileCode - The code of the file template to use for export.
+   * @param { DataValue[][] } data - The data to export, structured as an array of arrays of DataValue objects.
+   *
+   * @return { Promise<string | void> } - A promise that resolves to the file path of the exported Excel file.
+   */
   public async processExport(
+    referId: string,
     fileCode: string,
     data: DataValue[][],
   ): Promise<string | void> {
@@ -32,13 +49,16 @@ export class ExportService {
     const beginTime = performance.now();
 
     this.logger.log(`-------- Start export --------`);
-    this.logger.log(`\tProcessing export for file code: ${fileCode}`);
+    this.logger.log(
+      `\tProcessing export for file code: ${fileCode} - ${referId}`,
+    );
     this.logger.log(
       `\tLine data: ${data.map((e) => e.length).reduce((a, b) => a + b)}`,
     );
     this.logger.log(
       `\tSize: ${(new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2)}KB`,
     );
+    this.logger.log(`\tStart time: ${new Date().toLocaleString()}`);
 
     const workbook = (await this.readFileTemplate(
       fileCode,
@@ -72,14 +92,22 @@ export class ExportService {
 
       // Get worksheet
       const worksheet = workbook.worksheets[index];
+      const fileSheetTemplate = `${worksheet.name}-template`;
+      const worksheetTemplate = workbook.getWorksheet(fileSheetTemplate);
+      if (!worksheetTemplate) {
+        this.logger.error(
+          `Error: No template found for sheet ${worksheet.name}`,
+        );
+        throw new Error(`No template found for sheet ${worksheet.name}`);
+      }
 
       // Get list merge cells in sheet
-      const mergeCells = this.getListMergeCells(worksheet);
+      const mergeCells = this.getListMergeCells(worksheetTemplate);
       this.logStep(`(3.3)  Get list merge cells`, this.logTime(startTime));
 
       // Calculate total table height
       const totalTableHeight = this.calculateTotalTableHeight(
-        worksheet,
+        worksheetTemplate,
         configSheet.ranges,
         undefined,
         processData,
@@ -102,6 +130,7 @@ export class ExportService {
       // Generate file excel - main data
       this.generateExcelFile(
         worksheet,
+        worksheetTemplate,
         processData,
         configSheet,
         totalTableHeight,
@@ -110,13 +139,8 @@ export class ExportService {
       this.logStep(`(3.7)  Generate main excel`, this.logTime(startTime));
 
       // Generate file excel - main data
-      this.removeTemplateRange(worksheet, configSheet);
-      this.logStep(`(3.8)  Remove template range`, this.logTime(startTime));
-
-      // // Merge cell
-      // this.logger.log(
-      //   `(3.6)  Merge cell => Done ${this.logTime(startTime)}`,
-      // );
+      this.removeTemplateSheet(workbook, worksheetTemplate);
+      this.logStep(`(3.8)  Remove template sheet`, this.logTime(startTime));
     }
 
     // Remove sheet config
@@ -140,7 +164,13 @@ export class ExportService {
     return filePath;
   }
 
-  // Read file template
+  /**
+   * Read file template from the specified file code.
+   * This method reads an Excel file from the 'templates' directory.
+   * @param {string} fileCode - The code of the file template to read.
+   * @return {Promise<Excel.Workbook>} - A promise that resolves to an Excel workbook object.
+   * @private
+   */
   private async readFileTemplate(fileCode: string): Promise<Excel.Workbook> {
     let workbook: Excel.Workbook;
 
@@ -160,7 +190,13 @@ export class ExportService {
     return workbook;
   }
 
-  // Get config file
+  /**
+   * Read config for export algorithm from the 'config' worksheet.
+   *
+   * @param {Excel.Workbook} workbook - The Excel workbook object.
+   * @return {ConfigWorkbook} - The configuration object containing general settings and sheet configurations.
+   * @private
+   */
   private getConfigWorkbook(workbook: Excel.Workbook): ConfigWorkbook {
     const configWorkbook: ConfigWorkbook = {
       isHasGeneralData: false,
@@ -283,7 +319,14 @@ export class ExportService {
     return configWorkbook;
   }
 
-  // Process with tree structure
+  /**
+   * Using when process config file excel has tree structure.
+   *
+   * @param {ConfigRange[]} configRanges - The list of config ranges to add the new config range to.
+   * @param {ConfigRange} configRange - The new config range to add.
+   * @param {number} level - The current level in the tree structure.
+   * @private
+   */
   private getConfigWorkbookRecursive(
     configRanges: ConfigRange[],
     configRange: ConfigRange,
@@ -316,7 +359,14 @@ export class ExportService {
     }
   }
 
-  // Process data
+  /**
+   * Process data from array to tree structure.
+   *
+   * @param {ConfigSheet} configSheet - The configuration for the sheet.
+   * @param {DataValue[]} data - The data to process, structured as an array of DataValue objects.   *
+   * @return {DataTableLevel} - The processed data structured as a DataTableLevel object.
+   * @private
+   */
   private processData(
     configSheet: ConfigSheet,
     data: DataValue[],
@@ -340,7 +390,15 @@ export class ExportService {
     return dataTableLevel;
   }
 
-  // Process data with tree structure
+  /**
+   * Process data recursively to build a tree structure.
+   *
+   * @param {DataTableLevel} dataLevelTable - The current level of data table being processed.
+   * @param {number} level - The current level in the tree structure.
+   * @param {ConfigRange[]} configRanges - The configuration ranges for the current level.
+   * @param {DataValue} dataItem - The current data item being processed.
+   * @private
+   */
   private processDataRecursive(
     dataLevelTable: DataTableLevel,
     level: number,
@@ -532,6 +590,13 @@ export class ExportService {
     }
   }
 
+  /**
+   * Find all cell in worksheet and replace single text with data.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to process.
+   * @param {DataValue} generalData - The data to replace in the worksheet.
+   * @private
+   */
   private generateExcelFileGeneral(
     worksheet: Excel.Worksheet,
     generalData: DataValue,
@@ -552,8 +617,20 @@ export class ExportService {
     }
   }
 
+  /**
+   * Generate Excel file based on the provided worksheet, template, and data.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to generate the Excel file in.
+   * @param {Excel.Worksheet} worksheetTemplate - The template worksheet to copy from.
+   * @param {DataTableLevel} processData - The processed data to fill in the worksheet.
+   * @param {ConfigSheet} configSheet - The configuration for the sheet.
+   * @param {number} totalTableHeight - The total height of the table generated before this step.
+   * @param {Map<string, CMergeCell>} mergeCells - A map of merge cells to apply in the worksheet.
+   * @private
+   */
   private generateExcelFile(
     worksheet: Excel.Worksheet,
+    worksheetTemplate: Excel.Worksheet,
     processData: DataTableLevel,
     configSheet: ConfigSheet,
     totalTableHeight: number,
@@ -563,16 +640,14 @@ export class ExportService {
       return;
     }
 
-    const startRow =
-      Number(
-        worksheet.getCell(
-          configSheet.ranges[configSheet.ranges.length - 1].endCell,
-        ).row,
-      ) + 1;
+    const startRow = Number(
+      worksheet.getCell(configSheet.ranges[0].beginCell).row,
+    );
 
     this.generateExcelFileRecursive(
       startRow,
       worksheet,
+      worksheetTemplate,
       configSheet.ranges,
       processData.dataTables,
       0,
@@ -583,6 +658,7 @@ export class ExportService {
   private generateExcelFileRecursive(
     startRow: number,
     worksheet: Excel.Worksheet,
+    worksheetTemplate: Excel.Worksheet,
     configRanges: ConfigRange[],
     dataTables: DataTable[],
     level: number,
@@ -619,6 +695,7 @@ export class ExportService {
 
             this.copyRows(
               worksheet,
+              worksheetTemplate,
               beginRowTemplate,
               endRowTemplate,
               startRow + totalAppendRow,
@@ -659,6 +736,7 @@ export class ExportService {
               if (highRow > 0) {
                 this.copyRows(
                   worksheet,
+                  worksheetTemplate,
                   beginRowTemplate,
                   beginRowChildTemplate - 1,
                   startRow + totalAppendRow,
@@ -674,6 +752,7 @@ export class ExportService {
               const childRowNum = this.generateExcelFileRecursive(
                 startRow + totalAppendRow,
                 worksheet,
+                worksheetTemplate,
                 configRange.children,
                 dataRow.dataLevelTable.dataTables,
                 level + 1,
@@ -701,6 +780,7 @@ export class ExportService {
               if (highRow > 0) {
                 this.copyRows(
                   worksheet,
+                  worksheetTemplate,
                   endRowChildTemplate + 1,
                   endRowTemplate,
                   startRow + totalAppendRow,
@@ -741,6 +821,7 @@ export class ExportService {
         if (highRow > 0) {
           this.copyRows(
             worksheet,
+            worksheetTemplate,
             endRowRangeTemplate + 1,
             startNextRowRangeTemplate - 1,
             startRow + totalAppendRow,
@@ -755,6 +836,12 @@ export class ExportService {
     return totalAppendRow;
   }
 
+  /**
+   * Log time for a specific step in the export process.
+   *
+   * @param {{startTime: number}} time - An object containing the start time of the step.
+   * @private
+   */
   private logTime(time: { startTime: number }): string {
     const currentTime = performance.now();
 
@@ -769,6 +856,16 @@ export class ExportService {
     return `${formattedTime} ms`;
   }
 
+  /**
+   * Replace text in a range of cells in the worksheet.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to process.
+   * @param {number} startRow - The starting row number for the range.
+   * @param {number} endRow - The ending row number for the range.
+   * @param {DataValue} data - The data to replace in the cells.
+   * @param {'general' | 'table' | 'merge'} template - The type of template to use for replacement.
+   * @private
+   */
   private replaceTextRange(
     worksheet: Excel.Worksheet,
     startRow: number,
@@ -789,6 +886,14 @@ export class ExportService {
     }
   }
 
+  /**
+   * Replace text in a single cell based on the provided data and template type.
+   *
+   * @param {Excel.Cell} cell - The cell to process.
+   * @param {DataValue} data - The data to replace in the cell.
+   * @param {'general' | 'table' | 'merge'} template - The type of template to use for replacement.
+   * @private
+   */
   private replaceText(
     cell: Excel.Cell,
     data: DataValue,
@@ -814,10 +919,27 @@ export class ExportService {
     }
   }
 
+  /**
+   * Remove the config sheet from the workbook. After processing, the config sheet is no longer needed.
+   *
+   * @param {Excel.Workbook} workbook - The workbook to remove.
+   * @private
+   */
   private removeSheetConfig(workbook: Excel.Workbook): void {
     workbook.removeWorksheet('config');
   }
 
+  /**
+   * Calculate the total height of the table based on the configuration ranges and data.
+   * Using for insert empty rows before process file.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to calculate the height for.
+   * @param {ConfigRange[]} configRanges - The configuration ranges for the table.
+   * @param {ConfigRange | undefined} parentConfigRange - The parent configuration range, if any.
+   * @param {DataTableLevel} dataTableLevel - The data table level containing the data.
+   * @return {number} - The total height of the table in rows.
+   * @private
+   */
   private calculateTotalTableHeight(
     worksheet: Excel.Worksheet,
     configRanges: ConfigRange[],
@@ -923,12 +1045,22 @@ export class ExportService {
     );
   }
 
+  /**
+   * Copy a row from the template worksheet to the target worksheet.
+   *
+   * @param {Excel.Worksheet} worksheet - The target worksheet where the row will be copied.
+   * @param {Excel.Worksheet} worksheetTemplate - The template worksheet from which the row will be copied.
+   * @param {number} sourceRowNumber - The row number in the template worksheet to copy from.
+   * @param {number} targetRowNumber - The row number in the target worksheet to copy to.
+   * @private
+   */
   private copyRow(
     worksheet: Excel.Worksheet,
+    worksheetTemplate: Excel.Worksheet,
     sourceRowNumber: number,
     targetRowNumber: number,
   ) {
-    const sourceRow = worksheet.getRow(sourceRowNumber);
+    const sourceRow = worksheetTemplate.getRow(sourceRowNumber);
     const targetRow = worksheet.getRow(targetRowNumber);
 
     targetRow.height = sourceRow.height;
@@ -943,8 +1075,20 @@ export class ExportService {
     targetRow.commit();
   }
 
+  /**
+   * Copy rows from the template worksheet to the target worksheet.
+   *
+   * @param {Excel.Worksheet} worksheet - The target worksheet where the rows will be copied.
+   * @param {Excel.Worksheet} worksheetTemplate - The template worksheet from which the rows will be copied.
+   * @param {number} sourceStartRow - The starting row number in the template worksheet to copy from.
+   * @param {number} sourceEndRow - The ending row number in the template worksheet to copy from.
+   * @param {number} targetStartRow - The starting row number in the target worksheet to copy to.
+   * @param {Map<string, CMergeCell>} mergeCells - A map of merge cells to apply in the target worksheet.
+   * @private
+   */
   private copyRows(
     worksheet: Excel.Worksheet,
+    worksheetTemplate: Excel.Worksheet,
     sourceStartRow: number,
     sourceEndRow: number,
     targetStartRow: number,
@@ -954,13 +1098,13 @@ export class ExportService {
     for (let i = 0; i < rowCount; i++) {
       const sourceRowNum = sourceStartRow + i;
       const targetRowNum = targetStartRow + i;
-      this.copyRow(worksheet, sourceRowNum, targetRowNum);
+      this.copyRow(worksheet, worksheetTemplate, sourceRowNum, targetRowNum);
     }
 
     // Get list merge cells in sheet
     const setMergeSell = new Set<string>();
     for (let rowIndex = sourceStartRow; rowIndex <= sourceEndRow; rowIndex++) {
-      const row = worksheet.getRow(rowIndex);
+      const row = worksheetTemplate.getRow(rowIndex);
       const maxCol = row.cellCount;
       for (let colIndex = 1; colIndex <= maxCol; colIndex++) {
         const cell = row.getCell(colIndex);
@@ -1000,13 +1144,19 @@ export class ExportService {
     }
   }
 
+  /**
+   * Get a list of merge cells from the worksheet template.
+   *
+   * @param {Excel.Worksheet} worksheetTemplate - The worksheet template to extract merge cells from.
+   * @private
+   */
   private getListMergeCells(
-    worksheet: Excel.Worksheet,
+    worksheetTemplate: Excel.Worksheet,
   ): Map<string, CMergeCell> {
     // Get list merge cells in sheet
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-assignment
-    const merges = (worksheet as any)._merges;
+    const merges = (worksheetTemplate as any)._merges;
     const listMergeCells = new Map<string, CMergeCell>();
 
     for (const mergesKey in merges) {
@@ -1028,6 +1178,14 @@ export class ExportService {
     return listMergeCells;
   }
 
+  /**
+   * Insert empty rows into the worksheet before copy rows from the template.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to insert empty rows into.
+   * @param {number} height - The total height of the table to be inserted.
+   * @param {ConfigSheet} configSheet - The configuration for the sheet, which contains the ranges to insert empty rows.
+   * @private
+   */
   private insertEmptyRows(
     worksheet: Excel.Worksheet,
     height: number,
@@ -1035,14 +1193,13 @@ export class ExportService {
   ): void {
     const arrSteps: number[] = [];
 
-    // Split when height > 50000
-    if (height > 100000) {
-      const step = Math.floor(height / 100000);
+    if (height > this.LIMIT_INSERT_EMPTY_ROW) {
+      const step = Math.floor(height / this.LIMIT_INSERT_EMPTY_ROW);
       for (let i = 0; i < step; i++) {
-        arrSteps.push(100000);
+        arrSteps.push(this.LIMIT_INSERT_EMPTY_ROW);
       }
 
-      const lastStep = height - step * 100000;
+      const lastStep = height - step * this.LIMIT_INSERT_EMPTY_ROW;
       if (lastStep > 0) {
         arrSteps.push(lastStep);
       }
@@ -1053,9 +1210,7 @@ export class ExportService {
     // Insert empty rows
     if (arrSteps.length > 0) {
       const startRow = Number(
-        worksheet.getCell(
-          configSheet.ranges[configSheet.ranges.length - 1].endCell,
-        ).row,
+        worksheet.getCell(configSheet.ranges[0].beginCell).row,
       );
       for (const step of arrSteps) {
         worksheet.insertRows(startRow + 1, new Array(step), 'empty');
@@ -1063,37 +1218,40 @@ export class ExportService {
     }
   }
 
-  private removeTemplateRange(
-    worksheet: Excel.Worksheet,
-    configSheet: ConfigSheet,
+  /**
+   * Remove the template worksheet from the workbook after processing.
+   *
+   * @param {Excel.Workbook} workbook - The workbook from which to remove the template worksheet.
+   * @param {Excel.Worksheet} worksheetTemplate - The template worksheet to be removed.
+   * @private
+   */
+  private removeTemplateSheet(
+    workbook: Excel.Workbook,
+    worksheetTemplate: Excel.Worksheet,
   ) {
-    const startRow = Number(
-      worksheet.getCell(configSheet.ranges[0].beginCell).row,
-    );
-    const endRow = Number(
-      worksheet.getCell(
-        configSheet.ranges[configSheet.ranges.length - 1].endCell,
-      ).row,
-    );
-
-    const rowCount = endRow - startRow + 1;
-
-    for (let i = 0; i < rowCount; i++) {
-      const rowNumber = startRow + i;
-      const row = worksheet.getRow(rowNumber);
-      row.values = [];
-      row.commit();
-    }
-
-    worksheet.spliceRows(startRow, rowCount);
+    workbook.removeWorksheet(worksheetTemplate.name);
   }
 
+  /**
+   * Log a step in the export process with a message and the time taken for that step.
+   *
+   * @param {string} message - The message describing the step.
+   * @param {string} time - The time taken for the step, formatted as a string.
+   * @private
+   */
   private logStep(message: string, time: string) {
     const s1 = message.padEnd(50, '.');
     const s2 = time.padStart(15, ' ');
     this.logger.log(`${s1} => ${s2}`);
   }
 
+  /**
+   * Using for TEST purpose only. o(*￣︶￣*)o
+   * Save the temporary file to the result folder.
+   *
+   * @param {Excel.Worksheet} worksheet - The worksheet to save as a temporary file.
+   * @private
+   */
   private saveTempFile(worksheet: Excel.Worksheet) {
     const filePath = `results/temp_${this.utilService.generateUUIDv7()}.xlsx`;
     worksheet.workbook.xlsx.writeFile(filePath);

@@ -1,3 +1,4 @@
+// Author: AdonisGM - Nguyen Manh Tung
 import { Injectable } from '@nestjs/common';
 import * as winston from 'winston';
 import 'winston-daily-rotate-file';
@@ -20,7 +21,6 @@ export class LoggerService {
         message,
         label,
         timestamp,
-        className,
       }: {
         level: string;
         message: string;
@@ -28,27 +28,42 @@ export class LoggerService {
         timestamp: string;
         className: string;
       }) => {
-        return `${timestamp} [${label} - ${className}] ${level}: ${message}`;
+        return `${timestamp} [${label}] ${level}: ${message}`;
       },
     );
 
-    const transport = new winston.transports.DailyRotateFile({
-      filename: '%DATE%/info-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '50m',
-      maxFiles: '30d',
-      dirname: this.folderPath,
-    });
-
     this.logger = winston.createLogger({
-      level: 'info',
       format: winston.format.combine(
         winston.format.label({ label: 'AGM' }),
         winston.format.timestamp(),
         myFormat,
       ),
-      transports: [new winston.transports.Console(), transport],
+      transports: [
+        new winston.transports.Console(),
+        this.createTransports('info'),
+        this.createTransports('error'),
+        this.createTransports('warn'),
+        this.createTransports('debug'),
+        this.createTransports('verbose'),
+      ],
+    });
+  }
+
+  /**
+   * Create a winston transports
+   * @param {string} level - The level of the logger (e.g., 'info', 'error', 'warn', 'debug', 'verbose').
+   *
+   * @return {winston.Logger} - The winston logger instance.
+   */
+  public createTransports(level: string): winston.transport {
+    return new winston.transports.DailyRotateFile({
+      level: level,
+      filename: `%DATE%/${level}-%DATE%.log`,
+      datePattern: 'YYYY-MM-DD_HH',
+      zippedArchive: true,
+      maxSize: '50m',
+      maxFiles: '30d',
+      dirname: this.folderPath,
     });
   }
 
@@ -78,15 +93,43 @@ export class LoggerService {
    *
    * @return {void}
    */
-  public error(message: string): void {
+  // public error(message: string): void {
+  //   // get class name call this method
+  //   const stack = new Error().stack;
+  //   const className =
+  //     stack?.split('\n')[2].trim().split(' ')[1] ?? 'UnknownClass';
+  //
+  //   this.logger.error({
+  //     className: className,
+  //     message: message,
+  //   });
+  // }
+
+  /**
+   * Log an error message.
+   *
+   *
+   * @return {void}
+   * @param { Error } e
+   */
+  public error(e: Error | string): void {
     // get class name call this method
     const stack = new Error().stack;
     const className =
       stack?.split('\n')[2].trim().split(' ')[1] ?? 'UnknownClass';
 
+    if (typeof e === 'string') {
+      const newError = new Error(e);
+      this.logger.error({
+        className: className,
+        message: newError.stack,
+      });
+      return;
+    }
+
     this.logger.error({
       className: className,
-      message: message,
+      message: e.stack,
     });
   }
 

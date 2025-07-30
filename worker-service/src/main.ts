@@ -1,11 +1,11 @@
 // Author: AdonisGM - Nguyen Manh Tung
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { subDomainCheck } from './common/regex';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
 import { LoggerService } from './models/logger/logger.service';
 import * as bodyParser from 'body-parser';
+import { VersioningType } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -22,26 +22,18 @@ async function bootstrap() {
   logger.log(`=> Node: ${process.version}`);
   logger.log(`===============================================================`);
 
-  app.enableCors(
-    (req: Request, callback: (err: Error | null, option: object) => any) => {
-      const corsOptions = {
-        origin: false,
-        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-        preflightContinue: false,
-        optionsSuccessStatus: 204,
-      };
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
+    credentials: true,
+  });
 
-      const topDomainFe = process.env.TOP_DOMAIN_FE as string;
-      const url = req.headers['origin'] as string;
-      const isValid = subDomainCheck(topDomainFe, url);
-
-      if (isValid) {
-        corsOptions.origin = true;
-      }
-
-      callback(null, corsOptions);
-    },
-  );
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+    prefix: 'v',
+  });
 
   app.use(cookieParser());
 
@@ -51,7 +43,7 @@ async function bootstrap() {
   app.use(bodyParser.json({ limit: '500mb' }));
   app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
 
-  await app.listen(3000);
+  await app.listen(5000);
 }
 
 bootstrap();

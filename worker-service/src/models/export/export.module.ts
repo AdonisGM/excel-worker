@@ -7,6 +7,6 @@ import { ExportController } from './export.controller';
   imports: [],
   controllers: [ExportController],
   providers: [ExportService],
-  exports: [ExportService],
+  exports: [],
 })
 export class ExportModule {}

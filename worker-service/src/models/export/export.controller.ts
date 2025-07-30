@@ -14,10 +14,11 @@ export class ExportController {
   ) {
     const { code, data } = testDto;
 
-    // for (let i = 0; i < 500; i++) {
-    const pathFile = await this.exportService.processExport(code, data);
-    //   console.log('pathFile', pathFile);
-    // }
+    const pathFile = await this.exportService.processExport(
+      'testID',
+      code,
+      data,
+    );
 
     return {
       status: 'success',
