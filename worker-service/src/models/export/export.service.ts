@@ -15,6 +15,7 @@ import {
   DataValue,
 } from './export.type';
 import { UtilService } from '../util/util.service';
+import { FileService } from '../file/file.service';
 
 @Injectable()
 export class ExportService {
@@ -148,6 +149,9 @@ export class ExportService {
     this.logStep(`(4)  Remove sheet config`, this.logTime(startTime));
 
     // Save file
+    if (!fs.existsSync('results')) {
+      fs.mkdirSync('results', { recursive: true });
+    }
     const filePath = `results/${fileCode}_${this.utilService.generateUUIDv7()}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer({
       useSharedStrings: false,
@@ -1001,7 +1005,7 @@ export class ExportService {
         });
       }
 
-      // If can't find dataTable => skip
+      // If you can't find dataTable => skip
       if (!selectedDataTable) {
         continue;
       }

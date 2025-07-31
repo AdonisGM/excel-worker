@@ -1,4 +1,11 @@
 const call = () => {
+  const arr = [];
+  const data = {"ROW_NUM": 1, "GENERAL_NAME_REPORT": "", "CODE": "CODE_1", "NAME": "FULL_NAME_1"};
+
+  for (let i = 0; i < 5000; i++) {
+    arr.push(data);
+  }
+
 // call api
   fetch('http://localhost:4000/v1/excel/async', {
     method: 'POST',
@@ -14,12 +21,7 @@ const call = () => {
           "GENERAL_NAME_REPORT": "This is general data name report - Lorem",
           "CODE": "",
           "NAME": ""
-        }, {"ROW_NUM": 1, "GENERAL_NAME_REPORT": "", "CODE": "CODE_1", "NAME": "FULL_NAME_1"}, {
-          "ROW_NUM": 2,
-          "GENERAL_NAME_REPORT": "",
-          "CODE": "CODE_2",
-          "NAME": "FULL_NAME_2"
-        }]
+        }, ...arr],
       ]
     })
   }).then(r => r.json())
@@ -31,6 +33,6 @@ const call = () => {
                           });
 }
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 100; i++) {
   call();
 }

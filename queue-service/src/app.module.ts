@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from './models/logger/logger.module';
 import { UtilModule } from './models/util/util.module';
 import { ExcelModule } from './models/excel/excel.module';
+import { FileModule } from './models/file/file.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ExcelModule } from './models/excel/excel.module';
     LoggerModule,
     UtilModule,
     ExcelModule,
+    FileModule,
   ],
   controllers: [],
   providers: [],

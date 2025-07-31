@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ExportService } from '../export/export.service';
 import { BullModule } from '@nestjs/bullmq';
 import { BullMQConsumer } from './bullmq.consumer';
+import { FileService } from '../file/file.service';
 
 @Module({
   imports: [
@@ -11,7 +12,7 @@ import { BullMQConsumer } from './bullmq.consumer';
     }),
   ],
   controllers: [],
-  providers: [BullMQConsumer, ExportService],
+  providers: [BullMQConsumer, ExportService, FileService],
   exports: [],
 })
 export class BullMQModule {}

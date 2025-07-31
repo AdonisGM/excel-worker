@@ -3,6 +3,8 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { QueueData } from './bullmq.type';
 import { ExportService } from '../export/export.service';
+import { FileService } from '../file/file.service';
+import { LoggerService } from '../logger/logger.service';
 
 @Processor('queue_excel_simple', {
   concurrency: 1,
@@ -10,7 +12,11 @@ import { ExportService } from '../export/export.service';
 export class BullMQConsumer extends WorkerHost {
   queueName = 'queue_excel_simple';
 
-  constructor(private readonly exportService: ExportService) {
+  constructor(
+    private readonly exportService: ExportService,
+    private readonly fileService: FileService,
+    private readonly logger: LoggerService,
+  ) {
     super();
   }
 
@@ -33,6 +39,17 @@ export class BullMQConsumer extends WorkerHost {
       console.error(`Error processing job ${idQueueItem}:`, error);
       throw error; // Re-throw the error to ensure the job fails
     }
+
+    // Upload file to main storage
+    this.fileService
+      .uploadToMain(dataQueue.id, dataQueue.referId, location)
+      .then()
+      .catch((err) => {
+        this.logger.error(
+          `Failed to upload file for job ${idQueueItem} - location: ${location}`,
+        );
+        console.log(err);
+      });
 
     return {
       status: 'success',
