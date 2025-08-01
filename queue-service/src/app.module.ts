@@ -5,6 +5,7 @@ import { LoggerModule } from './models/logger/logger.module';
 import { UtilModule } from './models/util/util.module';
 import { ExcelModule } from './models/excel/excel.module';
 import { FileModule } from './models/file/file.module';
+import { ControlModule } from './models/control/control.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { FileModule } from './models/file/file.module';
     UtilModule,
     ExcelModule,
     FileModule,
+    ControlModule,
   ],
   controllers: [],
   providers: [],

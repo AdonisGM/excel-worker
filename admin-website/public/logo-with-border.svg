@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <bx:grid x="0" y="0" width="20" height="20"/>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="171.695" y1="34.343" x2="171.695" y2="171.925" id="gradient-0" gradientTransform="matrix(1.551921, 0, 0, 1.551921, -13.083479, -13.297617)">
+      <stop offset="0" style="stop-color: rgb(68.627% 68.627% 68.627%)"/>
+      <stop offset="1" style="stop-color: rgb(39.7% 39.7% 39.7%)"/>
+    </linearGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="137.303" y1="34.343" x2="137.303" y2="171.925" id="gradient-1" gradientTransform="matrix(1.551921, 0, 0, 1.548163, -13.083479, -13.168565)">
+      <stop offset="0" style="stop-color: rgb(19.608% 19.608% 19.608%)"/>
+      <stop offset="1" style="stop-color: rgb(12.727% 12.727% 12.727%)"/>
+    </linearGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="194.017" y1="34.343" x2="194.017" y2="171.715" id="gradient-2" gradientTransform="matrix(1.551921, 0, 0, 1.551921, -13.083479, -13.297617)">
+      <stop offset="0" style="stop-color: rgb(19.608% 19.608% 19.608%)"/>
+      <stop offset="1" style="stop-color: rgb(12.727% 12.727% 12.727%)"/>
+    </linearGradient>
+    <bx:export>
+      <bx:file format="png"/>
+      <bx:file format="svg"/>
+    </bx:export>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="200" y1="40" x2="200" y2="360" id="gradient-3" gradientTransform="matrix(1.125, 0, 0, 1.125, -25.000002, -25.000001)">
+      <stop offset="0" style="stop-color: rgb(84.706% 84.706% 84.706%)"/>
+      <stop offset="1" style="stop-color: rgb(48.42% 48.42% 48.42%)"/>
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="360" height="360" style="stroke: rgb(0, 0, 0); fill-rule: nonzero; paint-order: fill; fill: url(&quot;#gradient-3&quot;); fill-opacity: 0.14;" rx="74.846" ry="74.846"/>
+  <g transform="matrix(0.944963, 0, 0, 0.944963, 10.808808, 60.435791)" style="">
+    <polygon style="stroke: rgb(0, 0, 0); fill: url(&quot;#gradient-2&quot;);" points="253.405 40 253.405 253.191 322.627 253.191 322.627 40"/>
+    <polygon style="stroke: rgb(0, 0, 0); fill: url(&quot;#gradient-1&quot;);" points="40 253 253.405 40 360 40 146.809 252.675"/>
+    <polygon style="stroke: rgb(0, 0, 0); fill: url(&quot;#gradient-0&quot;);" points="146.747 253.517 306.702 40 360 40"/>
+  </g>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" x1="68.458" y1="72.386" x2="68.45800018310547" y2="72.38600158691406"/>
+</svg>

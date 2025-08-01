@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as fs from 'node:fs';
 import { LoggerService } from '../logger/logger.service';
 import { UtilService } from '../util/util.service';
@@ -9,6 +13,38 @@ export class FileService {
     private readonly logger: LoggerService,
     private readonly utilService: UtilService,
   ) {}
+
+  /**
+   * Get the result file by its name.
+   * @param {string} fileName - The name of the file to retrieve.
+   * @return {fs.ReadStream} A readable stream of the file.
+   */
+  public async getFileResult(fileName: string): Promise<fs.ReadStream> {
+    const filePath = `results/${fileName}`;
+
+    // Check if the file exists
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException(`File ${fileName} does not exist.`);
+    }
+
+    return fs.createReadStream(filePath);
+  }
+
+  /**
+   * Get the template file by its name.
+   * @param {string} fileName - The name of the file to retrieve.
+   * @return {fs.ReadStream} A readable stream of the file.
+   */
+  public async getFileTemplate(fileName: string): Promise<fs.ReadStream> {
+    const filePath = `templates/${fileName}`;
+
+    // Check if the file exists
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException(`Template ${fileName} does not exist.`);
+    }
+
+    return fs.createReadStream(filePath);
+  }
 
   /**
    * Get the list of file templates.
@@ -92,7 +128,8 @@ export class FileService {
     }
 
     // checks if the file already exists
-    const filePath = `results/${this.utilService.convertDateToString(new Date(), 'yyyy-MM-dd_HH-mm-ss-SSS')}_${file.originalname}`;
+    const fileName = `${this.utilService.convertDateToString(new Date(), 'yyyy-MM-dd_HH-mm-ss-SSS')}_${file.originalname}`;
+    const filePath = `results/${fileName}`;
     if (fs.existsSync(filePath)) {
       // Delete the existing file
       await fs.promises.unlink(filePath);

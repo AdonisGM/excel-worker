@@ -1,15 +1,18 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
 import { UtilService } from '../util/util.service';
+import { Response } from 'express';
 
 @Controller('file')
 export class FileController {
@@ -18,14 +21,32 @@ export class FileController {
     private readonly utilService: UtilService,
   ) {}
 
-  @Get('/download/result')
-  async downloadFileResult() {
-    return { message: 'Download file result success' };
+  @Get('/download/result/:fileName')
+  async downloadFileResult(
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    if (!fileName) {
+      throw new BadRequestException('File name is required');
+    }
+
+    const streamFile = await this.fileService.getFileResult(fileName);
+
+    streamFile.pipe(res);
   }
 
-  @Get('/download/template')
-  async downloadFileTemplate() {
-    return { message: 'Download file template success' };
+  @Get('/download/template/:fileName')
+  async downloadFileTemplate(
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    if (!fileName) {
+      throw new BadRequestException('File name is required');
+    }
+
+    const streamFile = await this.fileService.getFileTemplate(fileName);
+
+    streamFile.pipe(res);
   }
 
   @Get('/templates')

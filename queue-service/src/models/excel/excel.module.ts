@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ExcelController } from './excel.controller';
 import { ExcelService } from './excel.service';
-import { BullModule } from '@nestjs/bullmq';
+import { BullMQModule } from '../bullmq/bullmq.module';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({
-      name: 'queue_excel_simple',
-    }),
-  ],
+  imports: [BullMQModule],
   controllers: [ExcelController],
   providers: [ExcelService],
   exports: [],

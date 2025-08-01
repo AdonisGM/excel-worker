@@ -11,11 +11,12 @@ import { ZodValidationPipe } from '../../zod/zod.pipe';
 import { ExcelDto, excelSchema } from './excel.zod';
 import { UtilService } from '../util/util.service';
 import { LoggerService } from '../logger/logger.service';
+import { BullMQService } from '../bullmq/bullmq.service';
 
 @Controller('excel')
 export class ExcelController {
   constructor(
-    private readonly excelService: ExcelService,
+    private readonly bullMQService: BullMQService,
     private readonly utilService: UtilService,
     private readonly loggerService: LoggerService,
   ) {}
@@ -30,7 +31,7 @@ export class ExcelController {
     const id = this.utilService.generateUUIDv7();
 
     try {
-      await this.excelService.generate(id, referId, code, data);
+      await this.bullMQService.addQueue(id, referId, code, data);
     } catch (error) {
       const typedError = error as Error;
       this.loggerService.error(typedError);
