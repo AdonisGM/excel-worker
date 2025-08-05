@@ -9,13 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as QueueDashboardRouteImport } from './routes/queue/dashboard'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as QueueManageRouteImport } from './routes/queue/manage'
 import { Route as FileTemplatesRouteImport } from './routes/file/templates'
 import { Route as FileResultsRouteImport } from './routes/file/results'
+import { Route as QueueManageQueueNameRouteImport } from './routes/queue/manage/$queueName'
 
-const QueueDashboardRoute = QueueDashboardRouteImport.update({
-  id: '/queue/dashboard',
-  path: '/queue/dashboard',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QueueManageRoute = QueueManageRouteImport.update({
+  id: '/queue/manage',
+  path: '/queue/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FileTemplatesRoute = FileTemplatesRouteImport.update({
@@ -28,44 +35,79 @@ const FileResultsRoute = FileResultsRouteImport.update({
   path: '/file/results',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QueueManageQueueNameRoute = QueueManageQueueNameRouteImport.update({
+  id: '/$queueName',
+  path: '/$queueName',
+  getParentRoute: () => QueueManageRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
+  '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
-  '/queue/dashboard': typeof QueueDashboardRoute
+  '/queue/manage': typeof QueueManageRouteWithChildren
+  '/queue/manage/$queueName': typeof QueueManageQueueNameRoute
 }
 export interface FileRoutesByTo {
+  '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
-  '/queue/dashboard': typeof QueueDashboardRoute
+  '/queue/manage': typeof QueueManageRouteWithChildren
+  '/queue/manage/$queueName': typeof QueueManageQueueNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
-  '/queue/dashboard': typeof QueueDashboardRoute
+  '/queue/manage': typeof QueueManageRouteWithChildren
+  '/queue/manage/$queueName': typeof QueueManageQueueNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/file/results' | '/file/templates' | '/queue/dashboard'
+  fullPaths:
+    | '/login'
+    | '/file/results'
+    | '/file/templates'
+    | '/queue/manage'
+    | '/queue/manage/$queueName'
   fileRoutesByTo: FileRoutesByTo
-  to: '/file/results' | '/file/templates' | '/queue/dashboard'
-  id: '__root__' | '/file/results' | '/file/templates' | '/queue/dashboard'
+  to:
+    | '/login'
+    | '/file/results'
+    | '/file/templates'
+    | '/queue/manage'
+    | '/queue/manage/$queueName'
+  id:
+    | '__root__'
+    | '/login'
+    | '/file/results'
+    | '/file/templates'
+    | '/queue/manage'
+    | '/queue/manage/$queueName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  LoginRoute: typeof LoginRoute
   FileResultsRoute: typeof FileResultsRoute
   FileTemplatesRoute: typeof FileTemplatesRoute
-  QueueDashboardRoute: typeof QueueDashboardRoute
+  QueueManageRoute: typeof QueueManageRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/queue/dashboard': {
-      id: '/queue/dashboard'
-      path: '/queue/dashboard'
-      fullPath: '/queue/dashboard'
-      preLoaderRoute: typeof QueueDashboardRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/queue/manage': {
+      id: '/queue/manage'
+      path: '/queue/manage'
+      fullPath: '/queue/manage'
+      preLoaderRoute: typeof QueueManageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/file/templates': {
@@ -82,13 +124,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FileResultsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/queue/manage/$queueName': {
+      id: '/queue/manage/$queueName'
+      path: '/$queueName'
+      fullPath: '/queue/manage/$queueName'
+      preLoaderRoute: typeof QueueManageQueueNameRouteImport
+      parentRoute: typeof QueueManageRoute
+    }
   }
 }
 
+interface QueueManageRouteChildren {
+  QueueManageQueueNameRoute: typeof QueueManageQueueNameRoute
+}
+
+const QueueManageRouteChildren: QueueManageRouteChildren = {
+  QueueManageQueueNameRoute: QueueManageQueueNameRoute,
+}
+
+const QueueManageRouteWithChildren = QueueManageRoute._addFileChildren(
+  QueueManageRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
+  LoginRoute: LoginRoute,
   FileResultsRoute: FileResultsRoute,
   FileTemplatesRoute: FileTemplatesRoute,
-  QueueDashboardRoute: QueueDashboardRoute,
+  QueueManageRoute: QueueManageRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

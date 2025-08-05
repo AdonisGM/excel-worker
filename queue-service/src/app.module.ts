@@ -6,14 +6,17 @@ import { UtilModule } from './models/util/util.module';
 import { ExcelModule } from './models/excel/excel.module';
 import { FileModule } from './models/file/file.module';
 import { ControlModule } from './models/control/control.module';
+import { BullMQModule } from './models/bullmq/bullmq.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     BullModule.forRoot({
       connection: {
-        host: '138.2.105.62',
-        port: 6379,
+        host: process.env.REDIS_HOST,
+        port: Number(process.env.REDIS_PORT),
+        username: '',
+        password: '',
       },
     }),
     LoggerModule,
@@ -21,6 +24,7 @@ import { ControlModule } from './models/control/control.module';
     ExcelModule,
     FileModule,
     ControlModule,
+    BullMQModule,
   ],
   controllers: [],
   providers: [],

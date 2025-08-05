@@ -12,6 +12,7 @@ const excelSchema = z
         message: 'Code is required',
       }),
     data: z.array(z.array(z.record(z.any()))),
+    webhook: z.string(),
   })
   .required();
 

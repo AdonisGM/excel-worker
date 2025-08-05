@@ -6,7 +6,6 @@ import {
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
@@ -28,7 +27,7 @@ const data = {
     {
       name: "Export services",
       logo: GalleryVerticalEnd,
-      plan: "Oh hey, you!",
+      plan: "Workspace",
     },
   ],
   navMain: [
@@ -39,8 +38,8 @@ const data = {
       isActive: true,
       items: [
         {
-          title: "Dashboard",
-          url: "/queue/dashboard",
+          title: "Manage",
+          url: "/queue/manage",
         },
       ],
     },

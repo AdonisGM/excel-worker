@@ -1,0 +1,8 @@
+# Port
+PORT=4000
+
+# Database redis
+REDIS_HOST=192.168.0.0
+REDIS_PORT=6379
+REDIS_USER=******
+REDIS_PASSWORD=******

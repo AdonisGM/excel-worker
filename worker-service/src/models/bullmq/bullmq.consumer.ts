@@ -6,11 +6,11 @@ import { ExportService } from '../export/export.service';
 import { FileService } from '../file/file.service';
 import { LoggerService } from '../logger/logger.service';
 
-@Processor('queue_excel_simple', {
+@Processor('queue_excel_bo_01', {
   concurrency: 1,
 })
 export class BullMQConsumer extends WorkerHost {
-  queueName = 'queue_excel_simple';
+  queueName = 'queue_excel_bo_01';
 
   constructor(
     private readonly exportService: ExportService,

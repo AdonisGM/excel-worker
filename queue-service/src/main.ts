@@ -8,9 +8,7 @@ import * as bodyParser from 'body-parser';
 import { VersioningType } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: false,
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // log
   const logger = app.get(LoggerService);
@@ -35,6 +33,7 @@ async function bootstrap() {
     defaultVersion: '1',
     prefix: 'v',
   });
+  app.setGlobalPrefix('api');
 
   app.use(cookieParser());
 

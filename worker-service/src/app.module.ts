@@ -15,7 +15,7 @@ import { BullMQModule } from './models/bullmq/bullmq.module';
     ConfigModule.forRoot(),
     BullModule.forRoot({
       connection: {
-        host: '138.2.105.62',
+        host: '192.168.50.1',
         port: 6379,
       },
     }),

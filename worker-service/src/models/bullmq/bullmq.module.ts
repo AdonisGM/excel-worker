@@ -8,7 +8,7 @@ import { FileService } from '../file/file.service';
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: 'queue_excel_simple',
+      name: 'queue_excel_bo_01',
     }),
   ],
   controllers: [],
