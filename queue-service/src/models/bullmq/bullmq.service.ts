@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
+import { Queue } from 'bullmq';
 import { DataValue, QueueData } from '../excel/excel.type';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class BullMQService {
   private isPauseAdd: {
     name: string;
     isPaused: boolean;
-  }[];
+  }[] = [];
 
   constructor(
     @InjectQueue('queue_excel_bo_01')
@@ -31,7 +31,64 @@ export class BullMQService {
     private queueExcelVsms01: Queue<QueueData>,
     @InjectQueue('queue_word_vsms_01')
     private queueWordVsms01: Queue<QueueData>,
-  ) {}
+  ) {
+    const queueList = [
+      'queue_excel_bo_01',
+      'queue_excel_bo_02',
+      'queue_word_bo_01',
+      'queue_word_bo_02',
+      'queue_excel_fo_01',
+      'queue_word_fo_01',
+      'queue_excel_vsms_01',
+      'queue_word_vsms_01',
+    ];
+    this.isPauseAdd = queueList.map((name) => ({
+      name,
+      isPaused: false,
+    }));
+  }
+
+  /**
+   * Set pause/resume status for adding jobs to a queue.
+   * @param queueName Queue name.
+   * @param isPaused true: pause add; false: allow add.
+   */
+  public setPauseAdd(queueName: string, isPaused: boolean): void {
+    const found = this.isPauseAdd.findIndex((q) => q.name === queueName);
+    if (found === -1) {
+      this.isPauseAdd.push({ name: queueName, isPaused });
+    } else {
+      this.isPauseAdd[found].isPaused = isPaused;
+    }
+  }
+
+  /**
+   * Pause or resume the actual processing of the queue (not just adding).
+   * @param queueName
+   * @param isPaused true: pause queue, false: resume
+   */
+  public async setQueuePause(
+    queueName: string,
+    isPaused: boolean,
+  ): Promise<void> {
+    const queue = this.getQueueName(queueName);
+    const currentlyPaused = await queue.isPaused();
+    if (isPaused && !currentlyPaused) {
+      await queue.pause();
+    } else if (!isPaused && currentlyPaused) {
+      await queue.resume();
+    }
+  }
+
+  /**
+   * Check if adding jobs to the given queue is currently paused.
+   * @param queueName Queue name.
+   * @returns boolean indicating paused status
+   */
+  private isQueueAddPaused(queueName: string): boolean {
+    const found = this.isPauseAdd.find((q) => q.name === queueName);
+    return found ? found.isPaused : false;
+  }
 
   /**
    * Get queue by name
@@ -139,9 +196,9 @@ export class BullMQService {
   ): Promise<void> {
     const queue = this.getQueueName(queueName);
 
-    if (this.isPauseAdd) {
+    if (this.isQueueAddPaused(queueName)) {
       throw new BadRequestException(
-        'Queue is paused, cannot add new jobs at this time.',
+        `Queue "${queueName}" is currently paused. Cannot add new jobs at this time.`,
       );
     }
 
@@ -203,95 +260,34 @@ export class BullMQService {
     });
   }
 
-  // /**
-  //  * Get detail of a job by its ID
-  //  * @param {string} id - The ID of the job to retrieve
-  //  * @return {Promise<Job>} - A promise that resolves to the job details
-  //  */
-  // public async getDetailJob(id: string): Promise<Job> {
-  //   const job = (await this.queueExcelSimple.getJob(id)) as Job;
-  //   if (!job) {
-  //     throw new NotFoundException(`Job with ID ${id} not found`);
-  //   }
-  //   return job;
-  // }
-  //
-  // /**
-  //  * Delete all jobs in the queue
-  //  * @return {Promise<void>} - A promise that resolves when all jobs are deleted
-  //  */
-  // public async deleteAllJobs(): Promise<void> {
-  //   const jobs = (await this.queueExcelSimple.getJobs()) as Array<Job>;
-  //
-  //   for (const job of jobs) {
-  //     await job.remove();
-  //   }
-  // }
-  //
-  // /**
-  //  * Delete a job by its ID
-  //  * @param {string} id - The ID of the job to delete
-  //  * @return {Promise<void>} - A promise that resolves when the job is deleted
-  //  */
-  // public async deleteJobById(id: string): Promise<void> {
-  //   const job = (await this.queueExcelSimple.getJob(id)) as Job;
-  //   if (!job) {
-  //     throw new NotFoundException(`Job with ID ${id} not found`);
-  //   }
-  //   await job.remove();
-  // }
-  //
-  // /**
-  //  * Get status of the queue
-  //  */
-  // public async getQueueStatus(): Promise<{
-  //   isPaused: boolean;
-  //   isPausedAdd: boolean;
-  // }> {
-  //   return {
-  //     isPaused: await this.queueExcelSimple.isPaused(),
-  //     isPausedAdd: this.isPauseAdd,
-  //   };
-  // }
-  //
-  // /**
-  //  * Pause the queue
-  //  *
-  //  * @return {Promise<void>} - A promise that resolves when the queue is paused
-  //  */
-  // public async pause(isPause: boolean): Promise<void> {
-  //   const nowStatus = await this.queueExcelSimple.isPaused();
-  //   if (nowStatus === isPause) {
-  //     throw new BadRequestException(
-  //       `Queue is already ${isPause ? 'paused' : 'running'}.`,
-  //     );
-  //   }
-  //
-  //   if (!isPause) {
-  //     await this.queueExcelSimple.resume();
-  //   } else {
-  //     await this.queueExcelSimple.pause();
-  //   }
-  // }
-  //
-  // /**
-  //  * Pause adding new jobs to the queue
-  //  *
-  //  * @return {Promise<void>} - A promise that resolves when adding new jobs is paused
-  //  */
-  // public pauseAdd(isPause: boolean): void {
-  //   if (this.isPauseAdd === isPause) {
-  //     throw new BadRequestException(
-  //       `Adding new jobs is already ${isPause ? 'paused' : 'enabled'}.`,
-  //     );
-  //   }
-  //
-  //   this.isPauseAdd = isPause;
-  //
-  //   if (!isPause) {
-  //     // If resuming, we can add logic here if needed
-  //   } else {
-  //     // If pausing, we can add logic here if needed
-  //   }
-  // }
+  /**
+   * Remove all jobs from the queue (waiting, active, completed, failed, delayed)
+   * @param queueName Name of the queue
+   */
+  public async clearQueue(queueName: string): Promise<void> {
+    const queue = this.getQueueName(queueName);
+    await queue.drain(true); // remove all waiting and delayed jobs
+    await queue.clean(0, 0, 'completed');
+    await queue.clean(0, 0, 'failed');
+    await queue.clean(0, 0, 'delayed');
+    await queue.clean(0, 0, 'active');
+    // Repeat for waiting in case
+    await queue.clean(0, 0, 'wait');
+  }
+
+  /**
+   * Delete a job by ID from the specified queue.
+   * @param queueName Name of the queue
+   * @param jobId Job ID
+   */
+  public async deleteJobById(queueName: string, jobId: string): Promise<void> {
+    const queue = this.getQueueName(queueName);
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException(
+        `Job with ID ${jobId} not found in queue ${queueName}`,
+      );
+    }
+    await job.remove();
+  }
 }
