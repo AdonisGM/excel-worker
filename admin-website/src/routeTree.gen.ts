@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as QueueManageRouteImport } from './routes/queue/manage'
 import { Route as FileTemplatesRouteImport } from './routes/file/templates'
 import { Route as FileResultsRouteImport } from './routes/file/results'
@@ -18,6 +19,11 @@ import { Route as QueueManageQueueNameRouteImport } from './routes/queue/manage/
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QueueManageRoute = QueueManageRouteImport.update({
@@ -42,6 +48,7 @@ const QueueManageQueueNameRoute = QueueManageQueueNameRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
@@ -49,6 +56,7 @@ export interface FileRoutesByFullPath {
   '/queue/manage/$queueName': typeof QueueManageQueueNameRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
@@ -57,6 +65,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/file/results': typeof FileResultsRoute
   '/file/templates': typeof FileTemplatesRoute
@@ -66,6 +75,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/login'
     | '/file/results'
     | '/file/templates'
@@ -73,6 +83,7 @@ export interface FileRouteTypes {
     | '/queue/manage/$queueName'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/login'
     | '/file/results'
     | '/file/templates'
@@ -80,6 +91,7 @@ export interface FileRouteTypes {
     | '/queue/manage/$queueName'
   id:
     | '__root__'
+    | '/'
     | '/login'
     | '/file/results'
     | '/file/templates'
@@ -88,6 +100,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   FileResultsRoute: typeof FileResultsRoute
   FileTemplatesRoute: typeof FileTemplatesRoute
@@ -101,6 +114,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/queue/manage': {
@@ -147,6 +167,7 @@ const QueueManageRouteWithChildren = QueueManageRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   FileResultsRoute: FileResultsRoute,
   FileTemplatesRoute: FileTemplatesRoute,

@@ -1,12 +1,11 @@
-import type {BasicApi} from "@/apis/http-type.ts";
+import type {BasicApi} from '@/apis/http-type.ts';
 
-const getQueue: BasicApi = {
+export const getQueue: BasicApi = {
   url: '/v1/queue',
   method: 'GET',
   contentType: 'application/json',
-}
-type GetQueueReq = undefined
-type GetQueueRes = {
+};
+export interface GetQueueRes {
   name: string,
   count: number,
   activeCount: number,
@@ -15,5 +14,4 @@ type GetQueueRes = {
   failedCount: number,
   delayedCount: number,
   isPaused: boolean,
-}[]
-export {getQueue, type GetQueueReq, type GetQueueRes}
+}

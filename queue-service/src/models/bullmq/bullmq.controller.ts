@@ -47,11 +47,11 @@ export class BullMQController {
   @Get(':queueName/job')
   async queueGetListJobs(
     @Param('queueName') queueName: string,
-    @Query('page') page: number = 0,
-    @Query('limit') limit: number = 20,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
   ) {
-    const start = (page - 1) * limit;
-    const end = start + limit - 1;
+    const start = (page - 1) * Number(limit);
+    const end = Number(start) + Number(limit) - 1;
 
     return this.utilService.convertToPagination(
       await this.bullMQService.getListJobs(queueName, start, end),

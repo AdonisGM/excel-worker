@@ -103,7 +103,7 @@ export class UtilService {
         page: {
           page: page,
           limit: limit,
-          no: index + 1,
+          no: index + 1 + (page - 1) * limit,
         },
         ...item,
       };

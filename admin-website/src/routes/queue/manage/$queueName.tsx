@@ -1,11 +1,11 @@
-import {createFileRoute} from '@tanstack/react-router'
-import {Button} from "@/components/ui/button.tsx";
-import {Separator} from "@/components/ui/separator.tsx";
-import TableJobList from "@/components/agm/queue/table-job-list.tsx";
+import {createFileRoute} from '@tanstack/react-router';
+import {Separator} from '@/components/ui/separator.tsx';
+import TableJobList from '@/components/agm/queue/table-job-list.tsx';
+import QueueController from '@/components/agm/queue/queue-controller';
 
 export const Route = createFileRoute('/queue/manage/$queueName')({
   component: RouteComponent,
-})
+});
 
 function RouteComponent() {
   const {queueName} = Route.useParams();
@@ -27,19 +27,7 @@ function RouteComponent() {
       <div className={'flex items-center justify-between'}>
         <Separator orientation={'vertical'}/>
         <div>
-          <p className={'text-gray-600 text-xs text-center mb-3 font-bold'}>Queue controller</p>
-          <div className={'flex items-center gap-2'}>
-            <Button
-              size={'xs'}
-            >
-              In-Queue
-            </Button>
-            <Button
-              size={'xs'}
-            >
-              De-Queue
-            </Button>
-          </div>
+          <QueueController queueName={queueName} />
         </div>
         <Separator orientation={'vertical'}/>
       </div>
@@ -57,5 +45,5 @@ function RouteComponent() {
     </div>
     <Separator orientation={'horizontal'}/>
     <TableJobList queueName={queueName}/>
-  </div>
+  </div>;
 }

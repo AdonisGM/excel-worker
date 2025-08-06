@@ -242,8 +242,9 @@ export class BullMQService {
   > {
     const queue = this.getQueueName(queueName);
 
-    const jobs = await queue.getJobs(undefined, start, end, true);
-    const total = await queue.count();
+    const jobs = await queue.getJobs(['waiting', 'failed'], start, end, false);
+    const total =
+      (await queue.getFailedCount()) + (await queue.getWaitingCount());
 
     return jobs.map((job) => {
       return {
