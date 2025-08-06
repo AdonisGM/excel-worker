@@ -15,7 +15,6 @@ import {
   DataValue,
 } from './export.type';
 import { UtilService } from '../util/util.service';
-import { FileService } from '../file/file.service';
 
 @Injectable()
 export class ExportService {
@@ -229,7 +228,7 @@ export class ExportService {
         if (row.hasValues) {
           // get first cell - name general config
           const firstCell = row.getCell(1);
-          // get second cell - value general config
+          // get a second cell-value general config
           const secondCell = row.getCell(2);
 
           switch (firstCell.text) {
